@@ -1,0 +1,283 @@
+import csv
+import io
+import os
+import re
+from datetime import date, datetime, timedelta
+
+import psycopg2
+import psycopg2.extras
+from flask import Flask, jsonify, request
+
+app = Flask(__name__)
+
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+
+def get_conn():
+    return psycopg2.connect(DATABASE_URL)
+
+
+def row_to_memo(row):
+    return {
+        "id": str(row["id"]),
+        "date": row["date"].isoformat(),
+        "is_clinic_day": row["is_clinic_day"],
+        "summary": row["summary"],
+        "content": row["content"],
+        "created_at": row["created_at"].isoformat(),
+        "updated_at": row["updated_at"].isoformat(),
+    }
+
+
+def parse_bool(value, default=False):
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    return str(value).strip().lower() in ("1", "true", "yes", "on")
+
+
+# ---------------------------------------------------------------------------
+# Memo endpoints
+# ---------------------------------------------------------------------------
+
+@app.route("/api/memo", methods=["GET"])
+def list_memos():
+    qdate = request.args.get("date")
+    year = request.args.get("year")
+    month = request.args.get("month")
+
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            if qdate:
+                cur.execute("SELECT * FROM memos WHERE date = %s", (qdate,))
+            elif year and month:
+                cur.execute(
+                    """
+                    SELECT * FROM memos
+                    WHERE extract(year FROM date) = %s
+                      AND extract(month FROM date) = %s
+                    ORDER BY date
+                    """,
+                    (int(year), int(month)),
+                )
+            else:
+                cur.execute("SELECT * FROM memos ORDER BY date DESC LIMIT 90")
+            rows = cur.fetchall()
+
+    return jsonify([row_to_memo(r) for r in rows])
+
+
+@app.route("/api/memo", methods=["POST"])
+def upsert_memo():
+    data = request.get_json(force=True, silent=True) or {}
+    memo_date = data.get("date")
+    if not memo_date:
+        return jsonify({"error": "date is required"}), 400
+
+    is_clinic_day = parse_bool(data.get("is_clinic_day"))
+    summary = data.get("summary")
+    content = data.get("content")
+
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                INSERT INTO memos (date, is_clinic_day, summary, content)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (date) DO UPDATE
+                SET is_clinic_day = EXCLUDED.is_clinic_day,
+                    summary = EXCLUDED.summary,
+                    content = EXCLUDED.content,
+                    updated_at = now()
+                RETURNING *
+                """,
+                (memo_date, is_clinic_day, summary, content),
+            )
+            row = cur.fetchone()
+        conn.commit()
+
+    return jsonify(row_to_memo(row)), 201
+
+
+@app.route("/api/memo/<memo_id>", methods=["GET"])
+def get_memo(memo_id):
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT * FROM memos WHERE id = %s", (memo_id,))
+            row = cur.fetchone()
+
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(row_to_memo(row))
+
+
+@app.route("/api/memo/<memo_id>", methods=["PUT"])
+def update_memo(memo_id):
+    data = request.get_json(force=True, silent=True) or {}
+
+    fields = []
+    values = []
+    if "date" in data:
+        fields.append("date = %s")
+        values.append(data["date"])
+    if "is_clinic_day" in data:
+        fields.append("is_clinic_day = %s")
+        values.append(parse_bool(data["is_clinic_day"]))
+    if "summary" in data:
+        fields.append("summary = %s")
+        values.append(data["summary"])
+    if "content" in data:
+        fields.append("content = %s")
+        values.append(data["content"])
+
+    if not fields:
+        return jsonify({"error": "no fields to update"}), 400
+
+    fields.append("updated_at = now()")
+    values.append(memo_id)
+
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                f"UPDATE memos SET {', '.join(fields)} WHERE id = %s RETURNING *",
+                values,
+            )
+            row = cur.fetchone()
+        conn.commit()
+
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(row_to_memo(row))
+
+
+@app.route("/api/memo/<memo_id>", methods=["DELETE"])
+def delete_memo(memo_id):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM memos WHERE id = %s RETURNING id", (memo_id,))
+            deleted = cur.fetchone()
+        conn.commit()
+
+    if not deleted:
+        return jsonify({"error": "not found"}), 404
+    return jsonify({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# Vitals endpoints
+# ---------------------------------------------------------------------------
+
+@app.route("/api/vitals", methods=["GET"])
+def get_vitals():
+    qdate = request.args.get("date")
+    year = request.args.get("year")
+    month = request.args.get("month")
+
+    where = ""
+    params = ()
+    if qdate:
+        where = "WHERE date = %s"
+        params = (qdate,)
+    elif year and month:
+        where = "WHERE extract(year FROM date) = %s AND extract(month FROM date) = %s"
+        params = (int(year), int(month))
+
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(f"SELECT date, duration FROM sleep_data {where} ORDER BY date", params)
+            sleep_rows = cur.fetchall()
+            cur.execute(f"SELECT date, steps FROM steps_data {where} ORDER BY date", params)
+            steps_rows = cur.fetchall()
+
+    return jsonify({
+        "sleep": [{"date": r["date"].isoformat(), "duration": r["duration"]} for r in sleep_rows],
+        "steps": [{"date": r["date"].isoformat(), "steps": r["steps"]} for r in steps_rows],
+    })
+
+
+DATE_KEYS = ("date", "day", "日付")
+DURATION_KEYS = ("duration", "minutes", "sleep", "sleep_minutes", "分", "睡眠時間")
+STEPS_KEYS = ("steps", "step", "steps_count", "歩数")
+
+
+def find_key(fieldnames, candidates):
+    lowered = {f.strip().lower(): f for f in fieldnames if f}
+    for cand in candidates:
+        if cand in lowered:
+            return lowered[cand]
+    return None
+
+
+def parse_date_cell(value):
+    value = value.strip()
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y", "%Y%m%d"):
+        try:
+            return datetime.strptime(value, fmt).date().isoformat()
+        except ValueError:
+            continue
+    raise ValueError(f"unrecognized date format: {value}")
+
+
+@app.route("/api/vitals/import-csv", methods=["POST"])
+def import_vitals_csv():
+    data_type = request.form.get("type") or request.args.get("type")
+    if data_type not in ("sleep", "steps"):
+        return jsonify({"error": "type must be 'sleep' or 'steps'"}), 400
+
+    file = request.files.get("file")
+    if not file:
+        return jsonify({"error": "file is required"}), 400
+
+    text = file.read().decode("utf-8-sig")
+    reader = csv.DictReader(io.StringIO(text))
+    if not reader.fieldnames:
+        return jsonify({"error": "empty CSV"}), 400
+
+    date_key = find_key(reader.fieldnames, DATE_KEYS)
+    value_key = find_key(reader.fieldnames, DURATION_KEYS if data_type == "sleep" else STEPS_KEYS)
+
+    if not date_key or not value_key:
+        return jsonify({
+            "error": "could not detect columns",
+            "found_columns": reader.fieldnames,
+        }), 400
+
+    rows = []
+    errors = []
+    for i, r in enumerate(reader, start=2):
+        try:
+            d = parse_date_cell(r[date_key])
+            v = int(re.sub(r"[^\d-]", "", r[value_key]))
+            rows.append((d, v))
+        except (ValueError, KeyError, TypeError) as e:
+            errors.append(f"row {i}: {e}")
+
+    if not rows:
+        return jsonify({"error": "no valid rows", "details": errors}), 400
+
+    table = "sleep_data" if data_type == "sleep" else "steps_data"
+    col = "duration" if data_type == "sleep" else "steps"
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            psycopg2.extras.execute_values(
+                cur,
+                f"""
+                INSERT INTO {table} (date, {col}) VALUES %s
+                ON CONFLICT (date) DO UPDATE SET {col} = EXCLUDED.{col}
+                """,
+                rows,
+            )
+        conn.commit()
+
+    return jsonify({"imported": len(rows), "skipped": len(errors), "errors": errors[:20]})
+
+
+@app.route("/api/health", methods=["GET"])
+def health():
+    return jsonify({"ok": True, "time": datetime.utcnow().isoformat()})
+
+
+if __name__ == "__main__":
+    app.run(debug=True, port=5000)

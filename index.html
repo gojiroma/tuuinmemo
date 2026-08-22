@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>通院メモ</title>
+<meta name="theme-color" content="#3a6ea5">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --card-bg: #ffffff;
+    --border: #dde2e7;
+    --text: #22282f;
+    --text-dim: #6b7684;
+    --accent: #3a6ea5;
+    --accent-dim: #e7eef6;
+    --clinic: #e0793a;
+    --clinic-bg: #fdece0;
+    --danger: #c0392b;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 18px;
+    background: var(--accent);
+    color: #fff;
+  }
+  header h1 { font-size: 1.05rem; margin: 0; font-weight: 600; }
+  #statusBadge {
+    font-size: 0.75rem;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.2);
+  }
+  #statusBadge.offline { background: #c0392b; }
+  .app {
+    display: grid;
+    grid-template-columns: minmax(300px, 430px) 1fr;
+    gap: 14px;
+    padding: 14px;
+    align-items: start;
+  }
+  @media (max-width: 860px) {
+    .app { grid-template-columns: 1fr; }
+  }
+  .left { display: flex; flex-direction: column; gap: 14px; }
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+  }
+  .card h2 {
+    font-size: 0.95rem;
+    margin: 0 0 10px;
+    color: var(--text-dim);
+    font-weight: 600;
+  }
+  .cal-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .cal-nav button {
+    background: none; border: none; font-size: 1.1rem; cursor: pointer; color: var(--accent);
+    padding: 4px 10px;
+  }
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    text-align: center;
+  }
+  .cal-grid .dow { font-size: 0.72rem; color: var(--text-dim); padding-bottom: 4px; }
+  .cal-day {
+    position: relative;
+    padding: 8px 0;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    border: 1px solid transparent;
+  }
+  .cal-day:hover { background: var(--accent-dim); }
+  .cal-day.empty { cursor: default; }
+  .cal-day.empty:hover { background: none; }
+  .cal-day.clinic { background: var(--clinic-bg); color: var(--clinic); font-weight: 600; }
+  .cal-day.has-memo::after {
+    content: "";
+    position: absolute;
+    bottom: 3px; left: 50%;
+    transform: translateX(-50%);
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .cal-day.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .cal-day.today { text-decoration: underline; }
+  .field-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  .field-row label { font-size: 0.85rem; color: var(--text-dim); }
+  input[type=text], textarea, input[type=date] {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    background: #fff;
+    color: var(--text);
+  }
+  .selected-date-label { font-weight: 600; font-size: 1rem; margin-bottom: 6px; }
+  button.btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 7px 14px;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  button.btn.secondary { background: #fff; color: var(--accent); border: 1px solid var(--accent); }
+  button.btn.danger { background: #fff; color: var(--danger); border: 1px solid var(--danger); }
+  button.btn:disabled { opacity: 0.5; cursor: default; }
+  .editor-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px; }
+  .editor-toolbar .group { display: flex; gap: 6px; }
+  #contentEdit { width: 100%; min-height: 380px; resize: vertical; line-height: 1.5; }
+  #contentView { min-height: 380px; line-height: 1.6; }
+  #contentView h2 { font-size: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+  #contentView :first-child { margin-top: 0; }
+  .save-row { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+  #saveStatus { font-size: 0.78rem; color: var(--text-dim); }
+  .charts-row { display: flex; gap: 10px; }
+  .charts-row > div { flex: 1; min-width: 0; }
+  #chartsContainer { background: #fff; padding: 8px; border-radius: 8px; }
+  .import-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .import-row label.btn { display: inline-block; }
+  .import-row input[type=file] { display: none; }
+  .hint { font-size: 0.75rem; color: var(--text-dim); margin-top: 6px; }
+  footer { text-align: center; font-size: 0.7rem; color: var(--text-dim); padding: 16px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📋 通院メモ</h1>
+  <span id="statusBadge">オンライン</span>
+</header>
+
+<div class="app">
+  <div class="left">
+    <div class="card">
+      <div class="cal-nav">
+        <button id="prevMonth">‹</button>
+        <h2 id="monthLabel" style="margin:0;">-</h2>
+        <button id="nextMonth">›</button>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div class="hint">🟠 通院日 ・ 点＝メモあり</div>
+
+      <div class="selected-date-label" id="selectedDateLabel"></div>
+      <div class="field-row">
+        <input type="checkbox" id="clinicDayCheck">
+        <label for="clinicDayCheck">この日は通院日</label>
+      </div>
+      <div class="field-row" style="flex-direction:column; align-items:stretch;">
+        <label for="summaryInput" style="margin-bottom:4px;">サマリ（短い要約）</label>
+        <input type="text" id="summaryInput" placeholder="今日のひとこと要約">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>バイタル（睡眠・歩数）</h2>
+      <div id="chartsContainer">
+        <div class="charts-row">
+          <div><canvas id="sleepChart" height="160"></canvas></div>
+          <div><canvas id="stepsChart" height="160"></canvas></div>
+        </div>
+      </div>
+      <div class="import-row">
+        <button class="btn secondary" id="saveChartImageBtn">🖼 グラフを画像保存</button>
+        <label class="btn secondary">睡眠CSVインポート<input type="file" id="sleepCsvInput" accept=".csv"></label>
+        <label class="btn secondary">歩数CSVインポート<input type="file" id="stepsCsvInput" accept=".csv"></label>
+      </div>
+      <div class="hint">CSVは date/day 列 と duration(分)/steps 列を自動検出します。</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="editor-toolbar">
+      <h2 style="margin:0;">📝 Markdown メモ</h2>
+      <div class="group">
+        <button class="btn secondary" id="templateBtn">4セクション挿入</button>
+        <button class="btn secondary" id="toggleModeBtn">プレビュー</button>
+      </div>
+    </div>
+    <textarea id="contentEdit" placeholder="## 生活変化&#10;&#10;## 体調&#10;&#10;## 今後の意向&#10;&#10;## 質問・相談・依頼"></textarea>
+    <div id="contentView" style="display:none;"></div>
+    <div class="save-row">
+      <span id="saveStatus"></span>
+      <div class="group">
+        <button class="btn danger" id="deleteBtn">削除</button>
+        <button class="btn" id="saveBtn">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>通院メモ &middot; データは Neon PostgreSQL に保存されます</footer>
+
+<script>
+const TEMPLATE = `## 生活変化
+
+## 体調
+
+## 今後の意向
+
+## 質問・相談・依頼
+`;
+
+const state = {
+  year: new Date().getFullYear(),
+  month: new Date().getMonth() + 1, // 1-12
+  selectedDate: fmtDate(new Date()),
+  memosByDate: {},
+  vitals: { sleep: [], steps: [] },
+  editMode: true,
+  currentMemoId: null,
+};
+
+let sleepChart, stepsChart;
+
+function fmtDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function daysInMonth(year, month) {
+  return new Date(year, month, 0).getDate();
+}
+
+function firstWeekday(year, month) {
+  return new Date(year, month - 1, 1).getDay();
+}
+
+// ---------------------------------------------------------------------
+// Networking + offline cache
+// ---------------------------------------------------------------------
+
+function cacheKey(type) {
+  return `cache:${type}:${state.year}-${state.month}`;
+}
+
+async function apiGet(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
+  return res.json();
+}
+
+async function loadMonthData() {
+  const memoUrl = `/api/memo?year=${state.year}&month=${state.month}`;
+  const vitalsUrl = `/api/vitals?year=${state.year}&month=${state.month}`;
+  try {
+    const [memos, vitals] = await Promise.all([apiGet(memoUrl), apiGet(vitalsUrl)]);
+    state.memosByDate = {};
+    memos.forEach(m => { state.memosByDate[m.date] = m; });
+    state.vitals = vitals;
+    localStorage.setItem(cacheKey('memos'), JSON.stringify(memos));
+    localStorage.setItem(cacheKey('vitals'), JSON.stringify(vitals));
+    setStatus('オンライン', false);
+  } catch (e) {
+    console.warn('offline, using cache', e);
+    const cachedMemos = JSON.parse(localStorage.getItem(cacheKey('memos')) || '[]');
+    const cachedVitals = JSON.parse(localStorage.getItem(cacheKey('vitals')) || '{"sleep":[],"steps":[]}');
+    state.memosByDate = {};
+    cachedMemos.forEach(m => { state.memosByDate[m.date] = m; });
+    state.vitals = cachedVitals;
+    setStatus('オフライン（キャッシュ表示）', true);
+  }
+  renderCalendar();
+  renderCharts();
+}
+
+function setStatus(text, offline) {
+  const badge = document.getElementById('statusBadge');
+  badge.textContent = text;
+  badge.classList.toggle('offline', !!offline);
+}
+
+function draftKey(dateStr) {
+  return `draft:${dateStr}`;
+}
+
+function saveDraft(dateStr, data) {
+  localStorage.setItem(draftKey(dateStr), JSON.stringify({ ...data, savedAt: Date.now() }));
+}
+
+function getDraft(dateStr) {
+  const raw = localStorage.getItem(draftKey(dateStr));
+  return raw ? JSON.parse(raw) : null;
+}
+
+function clearDraft(dateStr) {
+  localStorage.removeItem(draftKey(dateStr));
+}
+
+async function syncPendingDrafts() {
+  const keys = Object.keys(localStorage).filter(k => k.startsWith('draft:'));
+  for (const key of keys) {
+    const dateStr = key.slice('draft:'.length);
+    const draft = JSON.parse(localStorage.getItem(key));
+    try {
+      const res = await fetch('/api/memo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: dateStr,
+          is_clinic_day: draft.is_clinic_day,
+          summary: draft.summary,
+          content: draft.content,
+        }),
+      });
+      if (res.ok) clearDraft(dateStr);
+    } catch (e) {
+      break; // still offline, stop trying
+    }
+  }
+  if (dateInCurrentMonth(state.selectedDate)) loadMonthData();
+}
+
+function dateInCurrentMonth(dateStr) {
+  const [y, m] = dateStr.split('-').map(Number);
+  return y === state.year && m === state.month;
+}
+
+window.addEventListener('online', () => { setStatus('オンライン', false); syncPendingDrafts(); });
+window.addEventListener('offline', () => setStatus('オフライン', true));
+
+// ---------------------------------------------------------------------
+// Calendar
+// ---------------------------------------------------------------------
+
+function renderCalendar() {
+  document.getElementById('monthLabel').textContent = `${state.year}年 ${state.month}月`;
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+
+  ['日', '月', '火', '水', '木', '金', '土'].forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'dow';
+    el.textContent = d;
+    grid.appendChild(el);
+  });
+
+  const blanks = firstWeekday(state.year, state.month);
+  for (let i = 0; i < blanks; i++) {
+    const el = document.createElement('div');
+    el.className = 'cal-day empty';
+    grid.appendChild(el);
+  }
+
+  const total = daysInMonth(state.year, state.month);
+  const todayStr = fmtDate(new Date());
+  for (let day = 1; day <= total; day++) {
+    const dateStr = `${state.year}-${String(state.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const memo = state.memosByDate[dateStr];
+    const el = document.createElement('div');
+    el.className = 'cal-day';
+    if (memo && memo.is_clinic_day) el.classList.add('clinic');
+    if (memo && (memo.summary || memo.content)) el.classList.add('has-memo');
+    if (dateStr === state.selectedDate) el.classList.add('selected');
+    if (dateStr === todayStr) el.classList.add('today');
+    el.textContent = day;
+    el.addEventListener('click', () => selectDate(dateStr));
+    grid.appendChild(el);
+  }
+}
+
+function selectDate(dateStr) {
+  state.selectedDate = dateStr;
+  const [y, m] = dateStr.split('-').map(Number);
+  if (y !== state.year || m !== state.month) {
+    state.year = y;
+    state.month = m;
+    loadMonthData().then(() => loadEditorForSelectedDate());
+    return;
+  }
+  renderCalendar();
+  loadEditorForSelectedDate();
+}
+
+function loadEditorForSelectedDate() {
+  const dateStr = state.selectedDate;
+  document.getElementById('selectedDateLabel').textContent = dateStr;
+  const memo = state.memosByDate[dateStr];
+  const draft = getDraft(dateStr);
+
+  const base = draft || memo || { is_clinic_day: false, summary: '', content: '' };
+  state.currentMemoId = memo ? memo.id : null;
+
+  document.getElementById('clinicDayCheck').checked = !!base.is_clinic_day;
+  document.getElementById('summaryInput').value = base.summary || '';
+  document.getElementById('contentEdit').value = base.content || '';
+
+  setSaveStatus(draft ? '未保存の下書きがあります' : '');
+  updatePreview();
+}
+
+// ---------------------------------------------------------------------
+// Editor
+// ---------------------------------------------------------------------
+
+function updatePreview() {
+  const content = document.getElementById('contentEdit').value;
+  document.getElementById('contentView').innerHTML = content.trim()
+    ? marked.parse(content)
+    : '<p style="color:#999;">（内容なし）</p>';
+}
+
+function setEditMode(edit) {
+  state.editMode = edit;
+  document.getElementById('contentEdit').style.display = edit ? 'block' : 'none';
+  document.getElementById('contentView').style.display = edit ? 'none' : 'block';
+  document.getElementById('toggleModeBtn').textContent = edit ? 'プレビュー' : '編集';
+  if (!edit) updatePreview();
+}
+
+function setSaveStatus(text) {
+  document.getElementById('saveStatus').textContent = text;
+}
+
+function currentFormData() {
+  return {
+    is_clinic_day: document.getElementById('clinicDayCheck').checked,
+    summary: document.getElementById('summaryInput').value,
+    content: document.getElementById('contentEdit').value,
+  };
+}
+
+function scheduleDraftSave() {
+  saveDraft(state.selectedDate, currentFormData());
+  setSaveStatus('下書きを保存しました（未同期）');
+}
+
+let draftTimer = null;
+function onFormInput() {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(scheduleDraftSave, 400);
+}
+
+document.getElementById('clinicDayCheck').addEventListener('change', onFormInput);
+document.getElementById('summaryInput').addEventListener('input', onFormInput);
+document.getElementById('contentEdit').addEventListener('input', onFormInput);
+
+document.getElementById('toggleModeBtn').addEventListener('click', () => setEditMode(!state.editMode));
+
+document.getElementById('templateBtn').addEventListener('click', () => {
+  const el = document.getElementById('contentEdit');
+  if (!el.value.trim()) {
+    el.value = TEMPLATE;
+  } else {
+    el.value += (el.value.endsWith('\n') ? '' : '\n') + '\n' + TEMPLATE;
+  }
+  onFormInput();
+});
+
+document.getElementById('saveBtn').addEventListener('click', async () => {
+  const dateStr = state.selectedDate;
+  const payload = { date: dateStr, ...currentFormData() };
+  try {
+    const res = await fetch('/api/memo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const memo = await res.json();
+    state.memosByDate[dateStr] = memo;
+    state.currentMemoId = memo.id;
+    clearDraft(dateStr);
+    setSaveStatus('保存しました ✓');
+    renderCalendar();
+  } catch (e) {
+    saveDraft(dateStr, currentFormData());
+    setSaveStatus('オフラインのため下書き保存しました');
+  }
+});
+
+document.getElementById('deleteBtn').addEventListener('click', async () => {
+  const dateStr = state.selectedDate;
+  if (!confirm(`${dateStr} のメモを削除しますか？`)) return;
+  clearDraft(dateStr);
+  const memo = state.memosByDate[dateStr];
+  if (memo) {
+    try {
+      await fetch(`/api/memo/${memo.id}`, { method: 'DELETE' });
+      delete state.memosByDate[dateStr];
+    } catch (e) {
+      setSaveStatus('オフラインのため削除できませんでした');
+      return;
+    }
+  }
+  document.getElementById('clinicDayCheck').checked = false;
+  document.getElementById('summaryInput').value = '';
+  document.getElementById('contentEdit').value = '';
+  setSaveStatus('削除しました');
+  renderCalendar();
+  updatePreview();
+});
+
+// ---------------------------------------------------------------------
+// Charts
+// ---------------------------------------------------------------------
+
+function renderCharts() {
+  const total = daysInMonth(state.year, state.month);
+  const labels = Array.from({ length: total }, (_, i) => String(i + 1));
+
+  const sleepByDate = {};
+  state.vitals.sleep.forEach(r => { sleepByDate[r.date] = r.duration; });
+  const stepsByDate = {};
+  state.vitals.steps.forEach(r => { stepsByDate[r.date] = r.steps; });
+
+  const clinicDays = new Set(
+    Object.values(state.memosByDate).filter(m => m.is_clinic_day).map(m => m.date)
+  );
+
+  const sleepData = [];
+  const sleepColors = [];
+  const stepsData = [];
+  const stepsColors = [];
+
+  for (let day = 1; day <= total; day++) {
+    const dateStr = `${state.year}-${String(state.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const isClinic = clinicDays.has(dateStr);
+    sleepData.push(sleepByDate[dateStr] ? +(sleepByDate[dateStr] / 60).toFixed(1) : 0);
+    sleepColors.push(isClinic ? '#e0793a' : '#3a6ea5');
+    stepsData.push(stepsByDate[dateStr] || 0);
+    stepsColors.push(isClinic ? '#e0793a' : '#4a9e6f');
+  }
+
+  if (sleepChart) sleepChart.destroy();
+  if (stepsChart) stepsChart.destroy();
+
+  sleepChart = new Chart(document.getElementById('sleepChart'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: '睡眠(時間)', data: sleepData, backgroundColor: sleepColors }] },
+    options: {
+      plugins: { legend: { display: false }, title: { display: true, text: '睡眠時間' } },
+      scales: { y: { beginAtZero: true } },
+    },
+  });
+
+  stepsChart = new Chart(document.getElementById('stepsChart'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: '歩数', data: stepsData, backgroundColor: stepsColors }] },
+    options: {
+      plugins: { legend: { display: false }, title: { display: true, text: '歩数' } },
+      scales: { y: { beginAtZero: true } },
+    },
+  });
+}
+
+document.getElementById('saveChartImageBtn').addEventListener('click', () => {
+  html2canvas(document.getElementById('chartsContainer')).then(canvas => {
+    const link = document.createElement('a');
+    link.download = `vitals_${state.year}-${String(state.month).padStart(2, '0')}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  });
+});
+
+// ---------------------------------------------------------------------
+// CSV import
+// ---------------------------------------------------------------------
+
+async function importCsv(inputEl, type) {
+  const file = inputEl.files[0];
+  if (!file) return;
+  const form = new FormData();
+  form.append('file', file);
+  form.append('type', type);
+  try {
+    const res = await fetch('/api/vitals/import-csv', { method: 'POST', body: form });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'import failed');
+    alert(`${result.imported}件インポートしました（${result.skipped}件スキップ）`);
+    loadMonthData();
+  } catch (e) {
+    alert('インポートに失敗しました: ' + e.message);
+  }
+  inputEl.value = '';
+}
+
+document.getElementById('sleepCsvInput').addEventListener('change', e => importCsv(e.target, 'sleep'));
+document.getElementById('stepsCsvInput').addEventListener('change', e => importCsv(e.target, 'steps'));
+
+// ---------------------------------------------------------------------
+// Month navigation
+// ---------------------------------------------------------------------
+
+document.getElementById('prevMonth').addEventListener('click', () => {
+  state.month -= 1;
+  if (state.month < 1) { state.month = 12; state.year -= 1; }
+  loadMonthData();
+});
+
+document.getElementById('nextMonth').addEventListener('click', () => {
+  state.month += 1;
+  if (state.month > 12) { state.month = 1; state.year += 1; }
+  loadMonthData();
+});
+
+// ---------------------------------------------------------------------
+// Init
+// ---------------------------------------------------------------------
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+
+setEditMode(true);
+setStatus(navigator.onLine ? 'オンライン' : 'オフライン', !navigator.onLine);
+loadMonthData().then(() => {
+  loadEditorForSelectedDate();
+  if (navigator.onLine) syncPendingDrafts();
+});
+</script>
+</body>
+</html>
