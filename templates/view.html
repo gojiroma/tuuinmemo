@@ -56,9 +56,7 @@
   }
   button.btn.secondary { background: #fff; color: var(--accent); border: 1px solid var(--accent); }
   button.btn.active { background: var(--accent); color: #fff; }
-  .charts-row { display: flex; gap: 16px; flex-wrap: wrap; }
-  .charts-row > div { flex: 1 1 380px; min-width: 0; }
-  .chart-box { height: 340px; position: relative; }
+  .chart-box { height: 400px; position: relative; }
   .entry-card { border-bottom: 1px solid var(--border); padding: 14px 0; }
   .entry-card:last-child { border-bottom: none; }
   .entry-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
@@ -97,10 +95,7 @@
       </div>
     </div>
     <div id="chartsContainer">
-      <div class="charts-row">
-        <div class="chart-box"><canvas id="sleepChart"></canvas></div>
-        <div class="chart-box"><canvas id="stepsChart"></canvas></div>
-      </div>
+      <div class="chart-box"><canvas id="vitalsChart"></canvas></div>
     </div>
     <div class="download-row">
       <button class="btn secondary" id="downloadChartImageBtn">🖼 グラフを画像としてダウンロード</button>
@@ -117,7 +112,7 @@
 
 <script>
 const state = { entries: [], vitals: { sleep: [], steps: [] }, vitalsMode: '31d' };
-let sleepChart, stepsChart;
+let vitalsChart;
 
 function fmtDate(d) {
   const y = d.getFullYear();
@@ -234,41 +229,46 @@ function vitalsRangeForMode(mode) {
   return { start: addDays(end, -365), end };
 }
 
-function buildSeries(rawRows, dateField, valueField, mode, clinicDates, convertFn) {
-  if (mode === '31d') {
-    const byDate = {};
-    rawRows.forEach(r => { byDate[r[dateField]] = r[valueField]; });
-    const { start, end } = vitalsRangeForMode(mode);
-    const labels = [];
-    const values = [];
-    const colors = [];
-    let d = start;
-    while (d <= end) {
-      labels.push(shortLabel(d));
-      const raw = byDate[d];
-      values.push(raw !== undefined ? convertFn(raw) : 0);
-      colors.push(clinicDates.has(d) ? '#e0793a' : null);
-      d = addDays(d, 1);
-    }
-    return { labels, values, colors };
-  }
+function nextMonthStart(dateStr) {
+  const [y, m] = dateStr.split('-').map(Number);
+  const ny = m === 12 ? y + 1 : y;
+  const nm = m === 12 ? 1 : m + 1;
+  return `${ny}-${String(nm).padStart(2, '0')}-01`;
+}
 
-  const groupFn = mode === 'week' ? weekStart : monthStart;
-  const labelFn = mode === 'week' ? shortLabel : monthLabel;
+// Every bucket key in [start, end] for the given mode, so bar/line series stay aligned.
+function bucketKeysForRange(mode, start, end) {
+  const keys = [];
+  if (mode === '31d') {
+    for (let d = start; d <= end; d = addDays(d, 1)) keys.push(d);
+  } else if (mode === 'week') {
+    const last = weekStart(end);
+    for (let d = weekStart(start); d <= last; d = addDays(d, 7)) keys.push(d);
+  } else {
+    const last = monthStart(end);
+    for (let d = monthStart(start); d <= last; d = nextMonthStart(d)) keys.push(d);
+  }
+  return keys;
+}
+
+function aggregateToKeys(rawRows, dateField, valueField, mode, keys, clinicDates, convertFn) {
+  const groupFn = mode === 'week' ? weekStart : mode === 'month' ? monthStart : (d => d);
+  const labelFn = mode === 'month' ? monthLabel : shortLabel;
   const buckets = {};
+  keys.forEach(k => { buckets[k] = { sum: 0, count: 0, clinic: false }; });
 
   rawRows.forEach(r => {
     const key = groupFn(r[dateField]);
-    if (!buckets[key]) buckets[key] = { sum: 0, count: 0, clinic: false };
-    buckets[key].sum += r[valueField];
-    buckets[key].count += 1;
+    if (buckets[key]) {
+      buckets[key].sum += r[valueField];
+      buckets[key].count += 1;
+    }
   });
   clinicDates.forEach(cd => {
     const key = groupFn(cd);
     if (buckets[key]) buckets[key].clinic = true;
   });
 
-  const keys = Object.keys(buckets).sort();
   return {
     labels: keys.map(labelFn),
     values: keys.map(k => convertFn(buckets[k].count ? buckets[k].sum / buckets[k].count : 0)),
@@ -278,28 +278,53 @@ function buildSeries(rawRows, dateField, valueField, mode, clinicDates, convertF
 
 function renderCharts() {
   const { start, end } = vitalsRangeForMode(state.vitalsMode);
+  const keys = bucketKeysForRange(state.vitalsMode, start, end);
   const clinicDates = new Set(
     state.entries.filter(m => m.is_clinic_day && m.date >= start && m.date <= end).map(m => m.date)
   );
 
-  const sleepSeries = buildSeries(state.vitals.sleep, 'date', 'duration', state.vitalsMode, clinicDates, v => +(v / 60).toFixed(1));
-  const stepsSeries = buildSeries(state.vitals.steps, 'date', 'steps', state.vitalsMode, clinicDates, v => Math.round(v));
+  const sleepSeries = aggregateToKeys(state.vitals.sleep, 'date', 'duration', state.vitalsMode, keys, clinicDates, v => +(v / 60).toFixed(1));
+  const stepsSeries = aggregateToKeys(state.vitals.steps, 'date', 'steps', state.vitalsMode, keys, clinicDates, v => Math.round(v));
 
-  if (sleepChart) sleepChart.destroy();
-  if (stepsChart) stepsChart.destroy();
+  if (vitalsChart) vitalsChart.destroy();
 
   const modeTitle = state.vitalsMode === '31d' ? '' : state.vitalsMode === 'week' ? '（週平均）' : '（月平均）';
 
-  sleepChart = new Chart(document.getElementById('sleepChart'), {
-    type: 'bar',
-    data: { labels: sleepSeries.labels, datasets: [{ label: '睡眠(時間)', data: sleepSeries.values, backgroundColor: sleepSeries.colors.map(c => c || '#3a6ea5') }] },
-    options: { maintainAspectRatio: false, plugins: { legend: { display: false }, title: { display: true, text: `睡眠時間${modeTitle}` } }, scales: { y: { beginAtZero: true } } },
-  });
-
-  stepsChart = new Chart(document.getElementById('stepsChart'), {
-    type: 'bar',
-    data: { labels: stepsSeries.labels, datasets: [{ label: '歩数', data: stepsSeries.values, backgroundColor: stepsSeries.colors.map(c => c || '#4a9e6f') }] },
-    options: { maintainAspectRatio: false, plugins: { legend: { display: false }, title: { display: true, text: `歩数${modeTitle}` } }, scales: { y: { beginAtZero: true } } },
+  vitalsChart = new Chart(document.getElementById('vitalsChart'), {
+    data: {
+      labels: stepsSeries.labels,
+      datasets: [
+        {
+          type: 'bar',
+          label: '歩数',
+          data: stepsSeries.values,
+          backgroundColor: stepsSeries.colors.map(c => c || '#4a9e6f'),
+          yAxisID: 'ySteps',
+        },
+        {
+          type: 'line',
+          label: '睡眠(時間)',
+          data: sleepSeries.values,
+          borderColor: '#3a6ea5',
+          backgroundColor: '#3a6ea5',
+          pointBackgroundColor: sleepSeries.colors.map(c => c || '#3a6ea5'),
+          pointRadius: sleepSeries.colors.map(c => c ? 6 : 3),
+          tension: 0.25,
+          yAxisID: 'ySleep',
+        },
+      ],
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true },
+        title: { display: true, text: `睡眠・歩数${modeTitle}` },
+      },
+      scales: {
+        ySteps: { type: 'linear', position: 'left', beginAtZero: true, title: { display: true, text: '歩数' } },
+        ySleep: { type: 'linear', position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, title: { display: true, text: '睡眠(時間)' } },
+      },
+    },
   });
 }
 
