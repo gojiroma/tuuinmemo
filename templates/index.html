@@ -265,6 +265,9 @@ async function loadEntries() {
     setStatus('オフライン（キャッシュ表示）', true);
   }
   renderEntryList();
+  // loadVitals() runs concurrently and may resolve first — re-render so the
+  // clinic-day highlight isn't stuck reflecting an empty entry list.
+  renderCharts();
 }
 
 function setStatus(text, offline) {
