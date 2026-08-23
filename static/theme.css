@@ -79,7 +79,7 @@ header {
 }
 header h1 { font-size: 1.02rem; margin: 0; font-weight: 600; letter-spacing: 0.01em; }
 header .header-right { display: flex; align-items: center; gap: 10px; }
-header a.nav-link {
+header .nav-link {
   color: #fff;
   font-size: 0.8rem;
   text-decoration: none;
@@ -88,8 +88,11 @@ header a.nav-link {
   padding: 4px 12px;
   transition: background var(--t-fast), opacity var(--t);
   white-space: nowrap;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
 }
-header a.nav-link:hover { background: rgba(255, 255, 255, 0.16); }
+header .nav-link:hover { background: rgba(255, 255, 255, 0.16); }
 #statusBadge {
   font-size: 0.72rem;
   padding: 3px 10px;

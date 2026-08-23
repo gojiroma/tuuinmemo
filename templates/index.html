@@ -116,6 +116,22 @@
   #saveStatus.saved { color: var(--success); }
   #saveStatus.pending { color: var(--text-dim); }
   #saveStatus.offline { color: var(--danger); }
+  .copy-btn { display: none; font-size: 0.78rem; padding: 5px 12px; }
+
+  /* View mode: doctor-facing read-only view of the same page, toggled
+     in place instead of navigating to a separate page/URL. */
+  body.view-mode .jump-row,
+  body.view-mode .entry-delete,
+  body.view-mode #templateBtn,
+  body.view-mode #combineImagesBtn,
+  body.view-mode #saveStatus,
+  body.view-mode #contentEdit,
+  body.view-mode .import-row,
+  body.view-mode .external-link-row,
+  body.view-mode .hint { display: none; }
+  body.view-mode .editor-split { grid-template-columns: 1fr; }
+  body.view-mode #contentView { max-height: none; }
+  body.view-mode .copy-btn { display: inline-block; }
 
   /* Vitals section ------------------------------------------------ */
   .vitals-section { padding: 16px; max-width: 1600px; margin: 0 auto; }
@@ -134,7 +150,7 @@
 <header>
   <h1>📋 通院メモ</h1>
   <div class="header-right">
-    <a class="nav-link ui-fade" href="/" target="_blank" rel="noopener">🩺 医師用ページを開く</a>
+    <button type="button" class="nav-link ui-fade" id="modeToggleBtn">🩺 閲覧モードに切替</button>
     <span id="statusBadge" class="ui-fade">オンライン</span>
   </div>
 </header>
@@ -169,6 +185,7 @@
       <div id="contentView"></div>
     </div>
     <div class="status-row">
+      <button class="btn secondary copy-btn" id="copyBtn">メモをコピー</button>
       <span id="saveStatus"></span>
     </div>
   </div>
@@ -694,6 +711,28 @@ async function importCsv(inputEl, type) {
 
 document.getElementById('sleepCsvInput').addEventListener('change', e => importCsv(e.target, 'sleep'));
 document.getElementById('stepsCsvInput').addEventListener('change', e => importCsv(e.target, 'steps'));
+
+// ---------------------------------------------------------------------
+// Mode toggle (edit <-> doctor-facing read-only view, same page/URL)
+// ---------------------------------------------------------------------
+
+function copyToClipboard(text, btn) {
+  navigator.clipboard.writeText(text || '').then(() => {
+    const original = btn.textContent;
+    btn.textContent = 'コピーしました ✓';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  });
+}
+
+document.getElementById('copyBtn').addEventListener('click', function () {
+  copyToClipboard(document.getElementById('contentEdit').value, this);
+});
+
+const modeToggleBtn = document.getElementById('modeToggleBtn');
+modeToggleBtn.addEventListener('click', () => {
+  const viewMode = document.body.classList.toggle('view-mode');
+  modeToggleBtn.textContent = viewMode ? '✏️ 編集モードに切替' : '🩺 閲覧モードに切替';
+});
 
 // ---------------------------------------------------------------------
 // Init

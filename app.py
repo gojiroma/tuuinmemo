@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 
 import psycopg2
 import psycopg2.extras
-from flask import Flask, jsonify, request, render_template, send_from_directory
+from flask import Flask, jsonify, redirect, request, render_template, send_from_directory
 
 app = Flask(__name__)
 
@@ -39,13 +39,15 @@ if DATABASE_URL:
 # ---------------------------------------------------------------------------
 
 @app.route("/")
-def doctor_view():
-    return render_template("view.html")
+def index():
+    return render_template("index.html")
 
 
 @app.route("/edit")
-def index():
-    return render_template("index.html")
+def edit_redirect():
+    # /edit used to be a separate page; the edit and doctor-view UIs are now
+    # one page with an in-place mode toggle, so old links/bookmarks land here.
+    return redirect("/")
 
 
 @app.route("/sw.js")

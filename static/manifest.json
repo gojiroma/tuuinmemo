@@ -2,7 +2,7 @@
   "name": "通院メモ",
   "short_name": "通院メモ",
   "description": "心療内科通院用の医療記録メモアプリ",
-  "start_url": "/edit",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#f4f6f8",
