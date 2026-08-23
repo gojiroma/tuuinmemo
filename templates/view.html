@@ -6,107 +6,50 @@
 <title>通院メモ（閲覧用）</title>
 <meta name="theme-color" content="#3a6ea5">
 <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <style>
-  :root {
-    --bg: #f4f6f8;
-    --card-bg: #ffffff;
-    --border: #dde2e7;
-    --text: #22282f;
-    --text-dim: #6b7684;
-    --accent: #3a6ea5;
-    --accent-dim: #e7eef6;
-    --clinic: #e0793a;
-    --clinic-bg: #fdece0;
-    --radius: 10px;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
-    background: var(--bg);
-    color: var(--text);
-  }
-  header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 18px;
-    background: var(--accent);
-    color: #fff;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-  header h1 { font-size: 1.05rem; margin: 0; font-weight: 600; }
-  header a.edit-link {
-    color: #fff;
-    font-size: 0.8rem;
-    text-decoration: none;
-    border: 1px solid rgba(255,255,255,0.5);
-    border-radius: 999px;
-    padding: 4px 12px;
-  }
-  header a.edit-link:hover { background: rgba(255,255,255,0.15); }
-  .wrap { max-width: 900px; margin: 0 auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
-  .card {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 14px;
-  }
-  .card h2 { font-size: 0.95rem; margin: 0 0 10px; color: var(--text-dim); font-weight: 600; }
-  .vitals-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
-  .period-toggle { display: flex; gap: 6px; }
-  button.btn {
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    padding: 7px 14px;
-    font-size: 0.85rem;
-    cursor: pointer;
-  }
-  button.btn.secondary { background: #fff; color: var(--accent); border: 1px solid var(--accent); }
-  button.btn.active { background: var(--accent); color: #fff; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
   .chart-box { height: 400px; position: relative; }
-  .entry-card { border-bottom: 1px solid var(--border); padding: 14px 0; }
-  .entry-card:last-child { border-bottom: none; }
-  .entry-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
-  .entry-date { font-weight: 700; font-size: 1rem; }
-  .entry-summary { color: var(--text-dim); font-size: 0.88rem; }
-  .badge-clinic {
-    font-size: 0.7rem;
-    background: var(--clinic-bg);
-    color: var(--clinic);
-    border-radius: 999px;
-    padding: 2px 10px;
-    font-weight: 600;
+  #chartsContainer { background: var(--bg-elevated); padding: 8px; border-radius: var(--radius-sm); transition: background var(--t); }
+
+  .entries-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 14px;
   }
+  .entry-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    transition: border-color var(--t), background var(--t);
+  }
+  .entry-top { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+  .entry-date { font-weight: 700; font-size: 1rem; }
+  .entry-weekday { font-size: 0.8rem; color: var(--text-faint); }
+  .entry-summary { color: var(--text-dim); font-size: 0.88rem; }
   .entry-content { line-height: 1.6; margin-top: 8px; }
   .entry-content h2 { font-size: 0.95rem; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
   .entry-content :first-child { margin-top: 0; }
-  .entry-actions { margin-top: 8px; }
+  .entry-actions { margin-top: 10px; }
   .copy-btn { font-size: 0.78rem; padding: 5px 12px; }
   .download-row { margin-top: 12px; }
-  .empty-hint { color: var(--text-dim); font-size: 0.85rem; padding: 10px 0; }
-  footer { text-align: center; font-size: 0.7rem; color: var(--text-dim); padding: 16px; }
-  footer a { color: var(--text-dim); }
 </style>
 </head>
 <body>
 <header>
   <h1>🩺 通院メモ（閲覧用）</h1>
-  <a class="edit-link" href="/edit" target="_blank" rel="noopener">✏️ 編集ページを開く</a>
+  <a class="nav-link ui-fade" href="/edit" target="_blank" rel="noopener">✏️ 編集ページを開く</a>
 </header>
 
 <div class="wrap">
   <div class="card">
     <div class="vitals-toolbar">
       <h2 style="margin:0;">バイタル（睡眠・歩数）</h2>
-      <div class="period-toggle">
-        <button class="btn secondary" data-mode="31d">直近31日</button>
+      <div class="period-toggle ui-fade">
+        <button class="btn secondary" data-mode="recent">直近50日</button>
         <button class="btn secondary" data-mode="week">週次</button>
         <button class="btn secondary" data-mode="month">月次</button>
       </div>
@@ -121,27 +64,24 @@
 
   <div class="card">
     <h2>記録一覧</h2>
-    <div id="entryList"></div>
+    <div class="entries-grid" id="entryList"></div>
   </div>
 </div>
 
 <footer>通院メモ（閲覧専用ページ）</footer>
 
+<script src="{{ url_for('static', filename='idle-ui.js') }}"></script>
+<script src="{{ url_for('static', filename='vitals-chart.js') }}"></script>
 <script>
-const state = { entries: [], vitals: { sleep: [], steps: [] }, vitalsMode: '31d' };
+const WEEKDAY_JA = ['日', '月', '火', '水', '木', '金', '土'];
+const state = { entries: [], vitals: { sleep: [], steps: [] }, vitalsMode: 'recent' };
 let vitalsChart;
 
-function fmtDate(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
+function fmtDate(d) { return VitalsChart.fmtDate(d); }
 
-function addDays(dateStr, n) {
+function weekdayLabel(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
-  d.setDate(d.getDate() + n);
-  return fmtDate(d);
+  return WEEKDAY_JA[d.getDay()];
 }
 
 async function apiGet(url) {
@@ -186,7 +126,7 @@ function renderEntries() {
 
     const top = document.createElement('div');
     top.className = 'entry-top';
-    top.innerHTML = `<span class="entry-date">${m.date}</span>` + (m.is_clinic_day ? '<span class="badge-clinic">通院日</span>' : '');
+    top.innerHTML = `<span class="entry-date">${m.date}</span><span class="entry-weekday">(${weekdayLabel(m.date)})</span>`;
     card.appendChild(top);
 
     if (m.summary) {
@@ -198,7 +138,7 @@ function renderEntries() {
 
     const content = document.createElement('div');
     content.className = 'entry-content';
-    content.innerHTML = (m.content || '').trim() ? marked.parse(m.content) : '<p style="color:#999;">（内容なし）</p>';
+    content.innerHTML = (m.content || '').trim() ? marked.parse(m.content) : '<p style="color:var(--text-faint);">（内容なし）</p>';
     card.appendChild(content);
 
     const actions = document.createElement('div');
@@ -215,138 +155,21 @@ function renderEntries() {
 }
 
 // ---------------------------------------------------------------------
-// Charts (same logic as the editor page)
+// Charts (shared logic with the editor page — see static/vitals-chart.js)
 // ---------------------------------------------------------------------
 
-function weekStart(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00');
-  const offset = (d.getDay() + 6) % 7;
-  d.setDate(d.getDate() - offset);
-  return fmtDate(d);
-}
-
-function monthStart(dateStr) {
-  return dateStr.slice(0, 7) + '-01';
-}
-
-function shortLabel(dateStr) {
-  const [, m, d] = dateStr.split('-');
-  return `${Number(m)}/${Number(d)}`;
-}
-
-function monthLabel(dateStr) {
-  const [y, m] = dateStr.split('-');
-  return `${y}/${Number(m)}`;
-}
-
-function vitalsRangeForMode(mode) {
-  const end = fmtDate(new Date());
-  if (mode === '31d') return { start: addDays(end, -30), end };
-  if (mode === 'week') return { start: addDays(end, -7 * 12 + 1), end };
-  return { start: addDays(end, -365), end };
-}
-
-function nextMonthStart(dateStr) {
-  const [y, m] = dateStr.split('-').map(Number);
-  const ny = m === 12 ? y + 1 : y;
-  const nm = m === 12 ? 1 : m + 1;
-  return `${ny}-${String(nm).padStart(2, '0')}-01`;
-}
-
-// Every bucket key in [start, end] for the given mode, so bar/line series stay aligned.
-function bucketKeysForRange(mode, start, end) {
-  const keys = [];
-  if (mode === '31d') {
-    for (let d = start; d <= end; d = addDays(d, 1)) keys.push(d);
-  } else if (mode === 'week') {
-    const last = weekStart(end);
-    for (let d = weekStart(start); d <= last; d = addDays(d, 7)) keys.push(d);
-  } else {
-    const last = monthStart(end);
-    for (let d = monthStart(start); d <= last; d = nextMonthStart(d)) keys.push(d);
-  }
-  return keys;
-}
-
-function aggregateToKeys(rawRows, dateField, valueField, mode, keys, clinicDates, convertFn) {
-  const groupFn = mode === 'week' ? weekStart : mode === 'month' ? monthStart : (d => d);
-  const labelFn = mode === 'month' ? monthLabel : shortLabel;
-  const buckets = {};
-  keys.forEach(k => { buckets[k] = { sum: 0, count: 0, clinic: false }; });
-
-  rawRows.forEach(r => {
-    const key = groupFn(r[dateField]);
-    if (buckets[key]) {
-      buckets[key].sum += r[valueField];
-      buckets[key].count += 1;
-    }
-  });
-  clinicDates.forEach(cd => {
-    const key = groupFn(cd);
-    if (buckets[key]) buckets[key].clinic = true;
-  });
-
-  return {
-    labels: keys.map(labelFn),
-    values: keys.map(k => convertFn(buckets[k].count ? buckets[k].sum / buckets[k].count : 0)),
-    colors: keys.map(k => buckets[k].clinic ? '#e0793a' : null),
-  };
-}
-
 function renderCharts() {
-  const { start, end } = vitalsRangeForMode(state.vitalsMode);
-  const keys = bucketKeysForRange(state.vitalsMode, start, end);
-  const clinicDates = new Set(
-    state.entries.filter(m => m.is_clinic_day && m.date >= start && m.date <= end).map(m => m.date)
+  vitalsChart = VitalsChart.renderVitalsChart(
+    document.getElementById('vitalsChart'),
+    vitalsChart,
+    state.entries,
+    state.vitals,
+    state.vitalsMode
   );
-
-  const sleepSeries = aggregateToKeys(state.vitals.sleep, 'date', 'duration', state.vitalsMode, keys, clinicDates, v => +(v / 60).toFixed(1));
-  const stepsSeries = aggregateToKeys(state.vitals.steps, 'date', 'steps', state.vitalsMode, keys, clinicDates, v => Math.round(v));
-
-  if (vitalsChart) vitalsChart.destroy();
-
-  const modeTitle = state.vitalsMode === '31d' ? '' : state.vitalsMode === 'week' ? '（週平均）' : '（月平均）';
-
-  vitalsChart = new Chart(document.getElementById('vitalsChart'), {
-    data: {
-      labels: stepsSeries.labels,
-      datasets: [
-        {
-          type: 'bar',
-          label: '歩数',
-          data: stepsSeries.values,
-          backgroundColor: stepsSeries.colors.map(c => c || '#4a9e6f'),
-          yAxisID: 'ySteps',
-        },
-        {
-          type: 'line',
-          label: '睡眠(時間)',
-          data: sleepSeries.values,
-          borderColor: '#3a6ea5',
-          backgroundColor: '#3a6ea5',
-          pointBackgroundColor: sleepSeries.colors.map(c => c || '#3a6ea5'),
-          pointRadius: sleepSeries.colors.map(c => c ? 6 : 3),
-          tension: 0.25,
-          yAxisID: 'ySleep',
-        },
-      ],
-    },
-    options: {
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: true },
-        title: { display: true, text: `睡眠・歩数${modeTitle}` },
-      },
-      scales: {
-        ySteps: { type: 'linear', position: 'left', beginAtZero: true, title: { display: true, text: '歩数' } },
-        ySleep: { type: 'linear', position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, title: { display: true, text: '睡眠(時間)' } },
-      },
-    },
-  });
 }
 
 async function loadVitals() {
-  const { start, end } = vitalsRangeForMode(state.vitalsMode);
+  const { start, end } = VitalsChart.vitalsRangeForMode(state.vitalsMode);
   try {
     state.vitals = await apiGet(`/api/vitals?start=${start}&end=${end}`);
   } catch (e) {
@@ -372,7 +195,7 @@ document.getElementById('downloadChartImageBtn').addEventListener('click', () =>
   });
 });
 
-document.querySelector('.period-toggle [data-mode="31d"]').classList.add('active');
+document.querySelector('.period-toggle [data-mode="recent"]').classList.add('active');
 loadEntries();
 loadVitals();
 </script>

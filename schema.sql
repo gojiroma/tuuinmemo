@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE TABLE IF NOT EXISTS memos (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     date date NOT NULL UNIQUE,
-    is_clinic_day boolean NOT NULL DEFAULT false,
+    is_clinic_day boolean NOT NULL DEFAULT true, -- kept for schema compat; API now always reports true (an entry existing = a clinic day)
     summary text,               -- サマリ（短い要約）
     content text,                -- Markdown コンテンツ
     created_at timestamptz NOT NULL DEFAULT now(),

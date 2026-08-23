@@ -8,172 +8,135 @@
 <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
 <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
 <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <style>
-  :root {
-    --bg: #f4f6f8;
-    --card-bg: #ffffff;
-    --border: #dde2e7;
-    --text: #22282f;
-    --text-dim: #6b7684;
-    --accent: #3a6ea5;
-    --accent-dim: #e7eef6;
-    --clinic: #e0793a;
-    --clinic-bg: #fdece0;
-    --danger: #c0392b;
-    --radius: 10px;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
-    background: var(--bg);
-    color: var(--text);
-  }
-  header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 18px;
-    background: var(--accent);
-    color: #fff;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-  header h1 { font-size: 1.05rem; margin: 0; font-weight: 600; }
-  header .header-right { display: flex; align-items: center; gap: 10px; }
-  header a.view-link {
-    color: #fff;
-    font-size: 0.8rem;
-    text-decoration: none;
-    border: 1px solid rgba(255,255,255,0.5);
-    border-radius: 999px;
-    padding: 4px 12px;
-  }
-  header a.view-link:hover { background: rgba(255,255,255,0.15); }
-  #statusBadge {
-    font-size: 0.75rem;
-    padding: 2px 10px;
-    border-radius: 999px;
-    background: rgba(255,255,255,0.2);
-  }
-  #statusBadge.offline { background: #c0392b; }
   .app {
     display: grid;
-    grid-template-columns: minmax(280px, 360px) 1fr;
-    gap: 14px;
-    padding: 14px;
+    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+    gap: 16px;
+    padding: 16px;
     padding-bottom: 0;
     align-items: start;
+    max-width: 1180px;
+    margin: 0 auto;
   }
   @media (max-width: 860px) {
     .app { grid-template-columns: 1fr; }
   }
-  .left { display: flex; flex-direction: column; gap: 14px; }
-  .card {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 14px;
-  }
-  .card h2 {
-    font-size: 0.95rem;
-    margin: 0 0 10px;
-    color: var(--text-dim);
-    font-weight: 600;
-  }
-  .jump-row { display: flex; gap: 6px; margin-bottom: 10px; }
+
+  /* Entry list -------------------------------------------------- */
+  .jump-row { display: flex; gap: 6px; margin-bottom: 12px; }
   .jump-row input[type=date] { flex: 1; }
   .entry-list {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    max-height: 420px;
+    gap: 3px;
+    max-height: 460px;
     overflow-y: auto;
+    margin: -2px;
+    padding: 2px;
   }
   .entry-row {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 8px 10px;
-    border-radius: 8px;
-    cursor: pointer;
+    align-items: center;
+    gap: 4px;
+    border-radius: var(--radius-sm);
     border: 1px solid transparent;
+    transition: background var(--t-fast), border-color var(--t-fast);
   }
   .entry-row:hover { background: var(--accent-dim); }
-  .entry-row.selected { border-color: var(--accent); background: var(--accent-dim); }
-  .entry-row .entry-top { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; }
-  .entry-row .entry-summary { font-size: 0.78rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .badge-clinic {
-    font-size: 0.68rem;
-    background: var(--clinic-bg);
-    color: var(--clinic);
+  .entry-row.selected { border-color: var(--accent-soft); background: var(--accent-dim); }
+  .entry-main { flex: 1; min-width: 0; cursor: pointer; padding: 8px 4px 8px 10px; }
+  .entry-top { display: flex; align-items: baseline; gap: 7px; }
+  .entry-date { font-size: 0.85rem; font-weight: 600; }
+  .entry-weekday { font-size: 0.72rem; color: var(--text-faint); }
+  .entry-today {
+    font-size: 0.65rem;
+    color: var(--accent);
+    background: var(--accent-dim);
     border-radius: 999px;
-    padding: 1px 8px;
+    padding: 1px 7px;
     font-weight: 600;
   }
-  .entry-empty { font-size: 0.82rem; color: var(--text-dim); padding: 8px 4px; }
-  .field-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
-  .field-row label { font-size: 0.85rem; color: var(--text-dim); }
-  input[type=text], textarea, input[type=date] {
-    width: 100%;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 10px;
-    font-size: 0.9rem;
-    font-family: inherit;
-    background: #fff;
-    color: var(--text);
+  .entry-summary {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
   }
-  .selected-date-label { font-weight: 600; font-size: 1rem; margin-bottom: 6px; }
-  button.btn {
-    background: var(--accent);
-    color: #fff;
+  .entry-delete {
+    flex-shrink: 0;
     border: none;
-    border-radius: 8px;
-    padding: 7px 14px;
+    background: transparent;
+    color: var(--text-faint);
     font-size: 0.85rem;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
+    opacity: 0;
+    transition: opacity var(--t-fast), background var(--t-fast), color var(--t-fast);
   }
-  button.btn.secondary { background: #fff; color: var(--accent); border: 1px solid var(--accent); }
-  button.btn.danger { background: #fff; color: var(--danger); border: 1px solid var(--danger); }
-  button.btn.active { background: var(--accent); color: #fff; }
-  button.btn:disabled { opacity: 0.5; cursor: default; }
-  .editor-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px; }
-  .editor-toolbar .group { display: flex; gap: 6px; }
-  #contentEdit { width: 100%; min-height: 380px; resize: vertical; line-height: 1.5; }
-  #contentView { min-height: 380px; line-height: 1.6; }
+  .entry-row:hover .entry-delete,
+  .entry-row:focus-within .entry-delete { opacity: 1; }
+  .entry-delete:hover { background: var(--danger-dim); color: var(--danger); }
+  .entry-empty { font-size: 0.82rem; color: var(--text-dim); padding: 8px 4px; }
+
+  /* Editor card --------------------------------------------------- */
+  .editor-card { display: flex; flex-direction: column; gap: 12px; }
+  .editor-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .selected-date-label { font-weight: 700; font-size: 1.1rem; }
+  .selected-date-weekday { font-size: 0.85rem; color: var(--text-dim); }
+  #summaryInput {
+    border: none;
+    border-bottom: 1px solid var(--border-soft);
+    border-radius: 0;
+    padding: 4px 2px;
+    background: transparent;
+  }
+  #summaryInput:focus { border-bottom-color: var(--accent); }
+
+  .editor-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; }
+  .editor-toolbar .group { display: flex; gap: 6px; flex-wrap: wrap; }
+  #contentEdit { width: 100%; min-height: 380px; resize: vertical; line-height: 1.55; }
+  #contentView { min-height: 380px; line-height: 1.65; }
   #contentView h2 { font-size: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
   #contentView :first-child { margin-top: 0; }
-  .save-row { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
-  #saveStatus { font-size: 0.78rem; color: var(--text-dim); }
+  .status-row { display: flex; justify-content: flex-end; align-items: center; }
+  #saveStatus { font-size: 0.78rem; color: var(--text-faint); transition: color var(--t); min-height: 1em; }
+  #saveStatus.saved { color: var(--success); }
+  #saveStatus.pending { color: var(--text-dim); }
+  #saveStatus.offline { color: var(--danger); }
 
-  .vitals-section { padding: 14px; }
+  /* Vitals section ------------------------------------------------ */
+  .vitals-section { padding: 16px; max-width: 1180px; margin: 0 auto; }
   .vitals-card { max-width: none; }
   .vitals-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
-  .period-toggle { display: flex; gap: 6px; }
   .chart-box { height: 440px; position: relative; }
-  #chartsContainer { background: #fff; padding: 8px; border-radius: 8px; }
+  #chartsContainer { background: var(--bg-elevated); padding: 8px; border-radius: var(--radius-sm); transition: background var(--t); }
+  .external-link-row { margin-top: 12px; }
+  .external-link-row a.btn { text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
   .import-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
   .import-row label.btn { display: inline-block; }
   .import-row input[type=file] { display: none; }
-  .hint { font-size: 0.75rem; color: var(--text-dim); margin-top: 6px; }
-  footer { text-align: center; font-size: 0.7rem; color: var(--text-dim); padding: 16px; }
 </style>
 </head>
 <body>
 <header>
   <h1>📋 通院メモ</h1>
   <div class="header-right">
-    <a class="view-link" href="/" target="_blank" rel="noopener">🩺 医師用ページを開く</a>
-    <span id="statusBadge">オンライン</span>
+    <a class="nav-link ui-fade" href="/" target="_blank" rel="noopener">🩺 医師用ページを開く</a>
+    <span id="statusBadge" class="ui-fade">オンライン</span>
   </div>
 </header>
 
 <div class="app">
-  <div class="left">
+  <div class="left fade-on-editor-focus">
     <div class="card">
       <h2>エントリ一覧</h2>
       <div class="jump-row">
@@ -181,35 +144,28 @@
         <button class="btn" id="jumpBtn">開く/新規</button>
       </div>
       <div class="entry-list" id="entryList"></div>
-
-      <div class="selected-date-label" id="selectedDateLabel" style="margin-top:14px;"></div>
-      <div class="field-row">
-        <input type="checkbox" id="clinicDayCheck">
-        <label for="clinicDayCheck">この日は通院日</label>
-      </div>
-      <div class="field-row" style="flex-direction:column; align-items:stretch;">
-        <label for="summaryInput" style="margin-bottom:4px;">サマリ（短い要約）</label>
-        <input type="text" id="summaryInput" placeholder="今日のひとこと要約">
-      </div>
     </div>
   </div>
 
-  <div class="card">
+  <div class="card editor-card" id="editorCard">
+    <div class="editor-head">
+      <span class="selected-date-label" id="selectedDateLabel"></span>
+      <span class="selected-date-weekday" id="selectedDateWeekday"></span>
+    </div>
+    <input type="text" id="summaryInput" placeholder="サマリ（今日のひとこと要約）">
+
     <div class="editor-toolbar">
       <h2 style="margin:0;">📝 Markdown メモ</h2>
       <div class="group">
         <button class="btn secondary" id="templateBtn">4セクション挿入</button>
+        <button class="btn secondary" id="combineImagesBtn">🖼 画像を結合保存</button>
         <button class="btn secondary" id="toggleModeBtn">プレビュー</button>
       </div>
     </div>
     <textarea id="contentEdit" placeholder="## 生活変化&#10;&#10;## 体調&#10;&#10;## 今後の意向&#10;&#10;## 質問・相談・依頼"></textarea>
     <div id="contentView" style="display:none;"></div>
-    <div class="save-row">
+    <div class="status-row">
       <span id="saveStatus"></span>
-      <div class="group">
-        <button class="btn danger" id="deleteBtn">削除</button>
-        <button class="btn" id="saveBtn">保存</button>
-      </div>
     </div>
   </div>
 </div>
@@ -218,14 +174,17 @@
   <div class="card vitals-card">
     <div class="vitals-toolbar">
       <h2 style="margin:0;">📊 バイタル（睡眠・歩数）</h2>
-      <div class="period-toggle">
-        <button class="btn secondary" data-mode="31d">直近31日</button>
+      <div class="period-toggle ui-fade">
+        <button class="btn secondary" data-mode="recent">直近50日</button>
         <button class="btn secondary" data-mode="week">週次</button>
         <button class="btn secondary" data-mode="month">月次</button>
       </div>
     </div>
     <div id="chartsContainer">
       <div class="chart-box"><canvas id="vitalsChart"></canvas></div>
+    </div>
+    <div class="external-link-row">
+      <a class="btn secondary" href="https://dashboard.exercise.quest/history" target="_blank" rel="noopener">📈 Exercise Dashboard の履歴を開く</a>
     </div>
     <div class="import-row">
       <button class="btn secondary" id="saveChartImageBtn">🖼 グラフを画像保存</button>
@@ -238,6 +197,9 @@
 
 <footer>通院メモ &middot; データは Neon PostgreSQL に保存されます</footer>
 
+<script src="{{ url_for('static', filename='idle-ui.js') }}"></script>
+<script src="{{ url_for('static', filename='vitals-chart.js') }}"></script>
+<script src="{{ url_for('static', filename='markdown-editor.js') }}"></script>
 <script>
 const TEMPLATE = `## 生活変化
 
@@ -248,29 +210,32 @@ const TEMPLATE = `## 生活変化
 ## 質問・相談・依頼
 `;
 
+const WEEKDAY_JA = ['日', '月', '火', '水', '木', '金', '土'];
+
 const state = {
-  selectedDate: fmtDate(new Date()),
+  selectedDate: VitalsChart.fmtDate(new Date()),
   entries: [],
   entriesByDate: {},
   vitals: { sleep: [], steps: [] },
-  vitalsMode: '31d',
+  vitalsMode: 'recent',
   editMode: true,
   currentMemoId: null,
 };
 
 let vitalsChart;
 
-function fmtDate(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+function fmtDate(d) { return VitalsChart.fmtDate(d); }
+function addDays(dateStr, n) { return VitalsChart.addDays(dateStr, n); }
+
+function weekdayLabel(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return WEEKDAY_JA[d.getDay()];
 }
 
-function addDays(dateStr, n) {
-  const d = new Date(dateStr + 'T00:00:00');
-  d.setDate(d.getDate() + n);
-  return fmtDate(d);
+function firstLine(content) {
+  if (!content) return '';
+  const line = (content.split('\n').find(l => l.trim()) || '');
+  return line.replace(/^#+\s*/, '').replace(/^-\s*/, '').trim();
 }
 
 // ---------------------------------------------------------------------
@@ -336,7 +301,6 @@ async function syncPendingDrafts() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date: dateStr,
-          is_clinic_day: draft.is_clinic_day,
           summary: draft.summary,
           content: draft.content,
         }),
@@ -365,26 +329,65 @@ function renderEntryList() {
     return;
   }
 
+  const today = fmtDate(new Date());
+
   state.entries.forEach(m => {
     const row = document.createElement('div');
     row.className = 'entry-row';
     if (m.date === state.selectedDate) row.classList.add('selected');
 
+    const main = document.createElement('div');
+    main.className = 'entry-main';
+    main.addEventListener('click', () => selectDate(m.date));
+
     const top = document.createElement('div');
     top.className = 'entry-top';
-    top.innerHTML = `<span>${m.date}</span>` + (m.is_clinic_day ? '<span class="badge-clinic">通院日</span>' : '');
-    row.appendChild(top);
 
-    if (m.summary) {
-      const summary = document.createElement('div');
-      summary.className = 'entry-summary';
-      summary.textContent = m.summary;
-      row.appendChild(summary);
+    const dateSpan = document.createElement('span');
+    dateSpan.className = 'entry-date';
+    dateSpan.textContent = m.date;
+    top.appendChild(dateSpan);
+
+    const wdSpan = document.createElement('span');
+    wdSpan.className = 'entry-weekday';
+    wdSpan.textContent = weekdayLabel(m.date);
+    top.appendChild(wdSpan);
+
+    if (m.date === today) {
+      const todayTag = document.createElement('span');
+      todayTag.className = 'entry-today';
+      todayTag.textContent = '今日';
+      top.appendChild(todayTag);
     }
+    main.appendChild(top);
 
-    row.addEventListener('click', () => selectDate(m.date));
+    const preview = document.createElement('div');
+    preview.className = 'entry-summary';
+    preview.textContent = m.summary || firstLine(m.content) || '（内容なし）';
+    main.appendChild(preview);
+
+    row.appendChild(main);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'entry-delete';
+    delBtn.type = 'button';
+    delBtn.setAttribute('aria-label', `${m.date} のメモを削除`);
+    delBtn.textContent = '🗑';
+    delBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteEntry(m.date);
+    });
+    row.appendChild(delBtn);
+
     list.appendChild(row);
   });
+}
+
+function flashJumpHighlight() {
+  const card = document.getElementById('editorCard');
+  card.classList.remove('jump-highlight');
+  void card.offsetWidth; // restart animation
+  card.classList.add('jump-highlight');
 }
 
 function selectDate(dateStr) {
@@ -392,22 +395,23 @@ function selectDate(dateStr) {
   document.getElementById('jumpDateInput').value = dateStr;
   renderEntryList();
   loadEditorForSelectedDate();
+  flashJumpHighlight();
 }
 
 function loadEditorForSelectedDate() {
   const dateStr = state.selectedDate;
   document.getElementById('selectedDateLabel').textContent = dateStr;
+  document.getElementById('selectedDateWeekday').textContent = `(${weekdayLabel(dateStr)})`;
   const memo = state.entriesByDate[dateStr];
   const draft = getDraft(dateStr);
 
-  const base = draft || memo || { is_clinic_day: false, summary: '', content: '' };
+  const base = draft || memo || { summary: '', content: '' };
   state.currentMemoId = memo ? memo.id : null;
 
-  document.getElementById('clinicDayCheck').checked = !!base.is_clinic_day;
   document.getElementById('summaryInput').value = base.summary || '';
   document.getElementById('contentEdit').value = base.content || '';
 
-  setSaveStatus(draft ? '未保存の下書きがあります' : '');
+  setSaveStatus(draft ? '未同期の下書きがあります' : '', draft ? 'offline' : '');
   updatePreview();
 }
 
@@ -424,7 +428,7 @@ function updatePreview() {
   const content = document.getElementById('contentEdit').value;
   document.getElementById('contentView').innerHTML = content.trim()
     ? marked.parse(content)
-    : '<p style="color:#999;">（内容なし）</p>';
+    : '<p style="color:var(--text-faint);">（内容なし）</p>';
 }
 
 function setEditMode(edit) {
@@ -435,32 +439,76 @@ function setEditMode(edit) {
   if (!edit) updatePreview();
 }
 
-function setSaveStatus(text) {
-  document.getElementById('saveStatus').textContent = text;
+function setSaveStatus(text, kind) {
+  const el = document.getElementById('saveStatus');
+  el.textContent = text;
+  el.classList.remove('saved', 'pending', 'offline');
+  if (kind) el.classList.add(kind);
 }
 
 function currentFormData() {
   return {
-    is_clinic_day: document.getElementById('clinicDayCheck').checked,
     summary: document.getElementById('summaryInput').value,
     content: document.getElementById('contentEdit').value,
   };
 }
 
-function scheduleDraftSave() {
-  saveDraft(state.selectedDate, currentFormData());
-  setSaveStatus('下書きを保存しました（未同期）');
-}
+// ---------------------------------------------------------------------
+// Autosave (no manual save button: every edit is persisted automatically)
+// ---------------------------------------------------------------------
 
-let draftTimer = null;
+let autosaveTimer = null;
+
 function onFormInput() {
-  clearTimeout(draftTimer);
-  draftTimer = setTimeout(scheduleDraftSave, 400);
+  setSaveStatus('入力中…', 'pending');
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(autosaveNow, 700);
 }
 
-document.getElementById('clinicDayCheck').addEventListener('change', onFormInput);
+async function autosaveNow() {
+  const dateStr = state.selectedDate;
+  const payload = currentFormData();
+
+  if (!payload.summary && !payload.content && !state.currentMemoId) {
+    clearDraft(dateStr);
+    setSaveStatus('', '');
+    return;
+  }
+
+  setSaveStatus('保存中…', 'pending');
+  try {
+    const res = await fetch('/api/memo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date: dateStr, ...payload }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const memo = await res.json();
+    state.entriesByDate[dateStr] = memo;
+    if (!state.entries.some(m => m.date === dateStr)) {
+      state.entries.unshift(memo);
+      state.entries.sort((a, b) => b.date.localeCompare(a.date));
+    } else {
+      state.entries = state.entries.map(m => m.date === dateStr ? memo : m);
+    }
+    state.currentMemoId = memo.id;
+    clearDraft(dateStr);
+    setSaveStatus('保存しました ✓', 'saved');
+    renderEntryList();
+    renderCharts();
+  } catch (e) {
+    saveDraft(dateStr, payload);
+    setSaveStatus('オフラインのため下書き保存しました', 'offline');
+  }
+}
+
 document.getElementById('summaryInput').addEventListener('input', onFormInput);
 document.getElementById('contentEdit').addEventListener('input', onFormInput);
+document.getElementById('contentEdit').addEventListener('keydown', function (e) {
+  applyMarkdownEditorKeydown(this, e);
+});
+document.getElementById('contentEdit').addEventListener('focus', () => document.body.classList.add('editor-focused'));
+document.getElementById('contentEdit').addEventListener('blur', () => document.body.classList.remove('editor-focused'));
 
 document.getElementById('toggleModeBtn').addEventListener('click', () => setEditMode(!state.editMode));
 
@@ -474,192 +522,116 @@ document.getElementById('templateBtn').addEventListener('click', () => {
   onFormInput();
 });
 
-document.getElementById('saveBtn').addEventListener('click', async () => {
-  const dateStr = state.selectedDate;
-  const payload = { date: dateStr, ...currentFormData() };
-  try {
-    const res = await fetch('/api/memo', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const memo = await res.json();
-    state.entriesByDate[dateStr] = memo;
-    if (!state.entries.some(m => m.date === dateStr)) {
-      state.entries.unshift(memo);
-      state.entries.sort((a, b) => b.date.localeCompare(a.date));
-    } else {
-      state.entries = state.entries.map(m => m.date === dateStr ? memo : m);
-    }
-    state.currentMemoId = memo.id;
-    clearDraft(dateStr);
-    setSaveStatus('保存しました ✓');
-    renderEntryList();
-    renderCharts();
-  } catch (e) {
-    saveDraft(dateStr, currentFormData());
-    setSaveStatus('オフラインのため下書き保存しました');
-  }
-});
-
-document.getElementById('deleteBtn').addEventListener('click', async () => {
-  const dateStr = state.selectedDate;
+async function deleteEntry(dateStr) {
   if (!confirm(`${dateStr} のメモを削除しますか？`)) return;
   clearDraft(dateStr);
   const memo = state.entriesByDate[dateStr];
   if (memo) {
     try {
       await fetch(`/api/memo/${memo.id}`, { method: 'DELETE' });
-      delete state.entriesByDate[dateStr];
-      state.entries = state.entries.filter(m => m.date !== dateStr);
     } catch (e) {
-      setSaveStatus('オフラインのため削除できませんでした');
+      setSaveStatus('オフラインのため削除できませんでした', 'offline');
       return;
     }
+    delete state.entriesByDate[dateStr];
+    state.entries = state.entries.filter(m => m.date !== dateStr);
   }
-  document.getElementById('clinicDayCheck').checked = false;
-  document.getElementById('summaryInput').value = '';
-  document.getElementById('contentEdit').value = '';
-  setSaveStatus('削除しました');
+
+  if (state.selectedDate === dateStr) {
+    document.getElementById('summaryInput').value = '';
+    document.getElementById('contentEdit').value = '';
+    state.currentMemoId = null;
+    setSaveStatus('削除しました', '');
+    updatePreview();
+  }
+
   renderEntryList();
   renderCharts();
-  updatePreview();
+}
+
+// ---------------------------------------------------------------------
+// Combine markdown-embedded images into one vertical PNG
+// ---------------------------------------------------------------------
+
+function extractImageUrls(markdown) {
+  const urls = [];
+  const re = /!\[[^\]]*\]\(\s*(\S+?)(?:\s+"[^"]*")?\s*\)/g;
+  let match;
+  while ((match = re.exec(markdown))) urls.push(match[1]);
+  return urls;
+}
+
+function loadImage(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(url));
+    img.src = url;
+  });
+}
+
+document.getElementById('combineImagesBtn').addEventListener('click', async () => {
+  const urls = extractImageUrls(document.getElementById('contentEdit').value);
+  if (!urls.length) {
+    alert('本文に画像（![alt](URL) 形式）が見つかりませんでした。');
+    return;
+  }
+
+  let images;
+  try {
+    images = await Promise.all(urls.map(loadImage));
+  } catch (e) {
+    alert('画像の読み込みに失敗しました: ' + e.message);
+    return;
+  }
+
+  const width = Math.max(...images.map(img => img.naturalWidth));
+  let y = 0;
+  const placed = images.map(img => {
+    const scale = width / img.naturalWidth;
+    const h = img.naturalHeight * scale;
+    const top = y;
+    y += h;
+    return { img, h, top };
+  });
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = Math.max(1, Math.round(y));
+  const ctx = canvas.getContext('2d');
+  placed.forEach(({ img, h, top }) => ctx.drawImage(img, 0, top, width, h));
+
+  let dataUrl;
+  try {
+    dataUrl = canvas.toDataURL('image/png');
+  } catch (e) {
+    alert('画像の結合に失敗しました（外部画像のセキュリティ制限の可能性があります）: ' + e.message);
+    return;
+  }
+
+  const link = document.createElement('a');
+  link.download = `memo_images_${state.selectedDate}.png`;
+  link.href = dataUrl;
+  link.click();
 });
 
 // ---------------------------------------------------------------------
 // Charts
 // ---------------------------------------------------------------------
 
-function weekStart(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00');
-  const offset = (d.getDay() + 6) % 7; // Monday = 0
-  d.setDate(d.getDate() - offset);
-  return fmtDate(d);
-}
-
-function monthStart(dateStr) {
-  return dateStr.slice(0, 7) + '-01';
-}
-
-function shortLabel(dateStr) {
-  const [, m, d] = dateStr.split('-');
-  return `${Number(m)}/${Number(d)}`;
-}
-
-function monthLabel(dateStr) {
-  const [y, m] = dateStr.split('-');
-  return `${y}/${Number(m)}`;
-}
-
-function vitalsRangeForMode(mode) {
-  const end = fmtDate(new Date());
-  if (mode === '31d') return { start: addDays(end, -30), end };
-  if (mode === 'week') return { start: addDays(end, -7 * 12 + 1), end };
-  return { start: addDays(end, -365), end }; // month: ~12 months back
-}
-
-function nextMonthStart(dateStr) {
-  const [y, m] = dateStr.split('-').map(Number);
-  const ny = m === 12 ? y + 1 : y;
-  const nm = m === 12 ? 1 : m + 1;
-  return `${ny}-${String(nm).padStart(2, '0')}-01`;
-}
-
-// Every bucket key in [start, end] for the given mode, so bar/line series stay aligned.
-function bucketKeysForRange(mode, start, end) {
-  const keys = [];
-  if (mode === '31d') {
-    for (let d = start; d <= end; d = addDays(d, 1)) keys.push(d);
-  } else if (mode === 'week') {
-    const last = weekStart(end);
-    for (let d = weekStart(start); d <= last; d = addDays(d, 7)) keys.push(d);
-  } else {
-    const last = monthStart(end);
-    for (let d = monthStart(start); d <= last; d = nextMonthStart(d)) keys.push(d);
-  }
-  return keys;
-}
-
-function aggregateToKeys(rawRows, dateField, valueField, mode, keys, clinicDates, convertFn) {
-  const groupFn = mode === 'week' ? weekStart : mode === 'month' ? monthStart : (d => d);
-  const labelFn = mode === 'month' ? monthLabel : shortLabel;
-  const buckets = {};
-  keys.forEach(k => { buckets[k] = { sum: 0, count: 0, clinic: false }; });
-
-  rawRows.forEach(r => {
-    const key = groupFn(r[dateField]);
-    if (buckets[key]) {
-      buckets[key].sum += r[valueField];
-      buckets[key].count += 1;
-    }
-  });
-  clinicDates.forEach(cd => {
-    const key = groupFn(cd);
-    if (buckets[key]) buckets[key].clinic = true;
-  });
-
-  return {
-    labels: keys.map(labelFn),
-    values: keys.map(k => convertFn(buckets[k].count ? buckets[k].sum / buckets[k].count : 0)),
-    colors: keys.map(k => buckets[k].clinic ? '#e0793a' : null),
-  };
-}
-
 function renderCharts() {
-  const { start, end } = vitalsRangeForMode(state.vitalsMode);
-  const keys = bucketKeysForRange(state.vitalsMode, start, end);
-  const clinicDates = new Set(
-    state.entries.filter(m => m.is_clinic_day && m.date >= start && m.date <= end).map(m => m.date)
+  vitalsChart = VitalsChart.renderVitalsChart(
+    document.getElementById('vitalsChart'),
+    vitalsChart,
+    state.entries,
+    state.vitals,
+    state.vitalsMode
   );
-
-  const sleepSeries = aggregateToKeys(state.vitals.sleep, 'date', 'duration', state.vitalsMode, keys, clinicDates, v => +(v / 60).toFixed(1));
-  const stepsSeries = aggregateToKeys(state.vitals.steps, 'date', 'steps', state.vitalsMode, keys, clinicDates, v => Math.round(v));
-
-  if (vitalsChart) vitalsChart.destroy();
-
-  const modeTitle = state.vitalsMode === '31d' ? '' : state.vitalsMode === 'week' ? '（週平均）' : '（月平均）';
-
-  vitalsChart = new Chart(document.getElementById('vitalsChart'), {
-    data: {
-      labels: stepsSeries.labels,
-      datasets: [
-        {
-          type: 'bar',
-          label: '歩数',
-          data: stepsSeries.values,
-          backgroundColor: stepsSeries.colors.map(c => c || '#4a9e6f'),
-          yAxisID: 'ySteps',
-        },
-        {
-          type: 'line',
-          label: '睡眠(時間)',
-          data: sleepSeries.values,
-          borderColor: '#3a6ea5',
-          backgroundColor: '#3a6ea5',
-          pointBackgroundColor: sleepSeries.colors.map(c => c || '#3a6ea5'),
-          pointRadius: sleepSeries.colors.map(c => c ? 6 : 3),
-          tension: 0.25,
-          yAxisID: 'ySleep',
-        },
-      ],
-    },
-    options: {
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: true },
-        title: { display: true, text: `睡眠・歩数${modeTitle}` },
-      },
-      scales: {
-        ySteps: { type: 'linear', position: 'left', beginAtZero: true, title: { display: true, text: '歩数' } },
-        ySleep: { type: 'linear', position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, title: { display: true, text: '睡眠(時間)' } },
-      },
-    },
-  });
 }
 
 async function loadVitals() {
-  const { start, end } = vitalsRangeForMode(state.vitalsMode);
+  const { start, end } = VitalsChart.vitalsRangeForMode(state.vitalsMode);
   const cacheK = `cache:vitals:${state.vitalsMode}`;
   try {
     const vitals = await apiGet(`/api/vitals?start=${start}&end=${end}`);
@@ -723,7 +695,7 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-document.querySelector('.period-toggle [data-mode="31d"]').classList.add('active');
+document.querySelector('.period-toggle [data-mode="recent"]').classList.add('active');
 document.getElementById('jumpDateInput').value = state.selectedDate;
 setEditMode(true);
 setStatus(navigator.onLine ? 'オンライン' : 'オフライン', !navigator.onLine);

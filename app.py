@@ -58,20 +58,14 @@ def row_to_memo(row):
     return {
         "id": str(row["id"]),
         "date": row["date"].isoformat(),
-        "is_clinic_day": row["is_clinic_day"],
+        # An entry existing for a date *is* the clinic-day signal now, so this
+        # is always true rather than a separately toggled flag.
+        "is_clinic_day": True,
         "summary": row["summary"],
         "content": row["content"],
         "created_at": row["created_at"].isoformat(),
         "updated_at": row["updated_at"].isoformat(),
     }
-
-
-def parse_bool(value, default=False):
-    if isinstance(value, bool):
-        return value
-    if value is None:
-        return default
-    return str(value).strip().lower() in ("1", "true", "yes", "on")
 
 
 # ---------------------------------------------------------------------------
@@ -101,7 +95,6 @@ def upsert_memo():
     if not memo_date:
         return jsonify({"error": "date is required"}), 400
 
-    is_clinic_day = parse_bool(data.get("is_clinic_day"))
     summary = data.get("summary")
     content = data.get("content")
 
@@ -109,16 +102,15 @@ def upsert_memo():
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 """
-                INSERT INTO memos (date, is_clinic_day, summary, content)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO memos (date, summary, content)
+                VALUES (%s, %s, %s)
                 ON CONFLICT (date) DO UPDATE
-                SET is_clinic_day = EXCLUDED.is_clinic_day,
-                    summary = EXCLUDED.summary,
+                SET summary = EXCLUDED.summary,
                     content = EXCLUDED.content,
                     updated_at = now()
                 RETURNING *
                 """,
-                (memo_date, is_clinic_day, summary, content),
+                (memo_date, summary, content),
             )
             row = cur.fetchone()
         conn.commit()
@@ -147,9 +139,6 @@ def update_memo(memo_id):
     if "date" in data:
         fields.append("date = %s")
         values.append(data["date"])
-    if "is_clinic_day" in data:
-        fields.append("is_clinic_day = %s")
-        values.append(parse_bool(data["is_clinic_day"]))
     if "summary" in data:
         fields.append("summary = %s")
         values.append(data["summary"])
@@ -197,7 +186,7 @@ def delete_memo(memo_id):
 @app.route("/api/vitals", methods=["GET"])
 def get_vitals():
     end = request.args.get("end") or date.today().isoformat()
-    start = request.args.get("start") or (date.fromisoformat(end) - timedelta(days=30)).isoformat()
+    start = request.args.get("start") or (date.fromisoformat(end) - timedelta(days=49)).isoformat()
 
     where = "WHERE date BETWEEN %s AND %s"
     params = (start, end)

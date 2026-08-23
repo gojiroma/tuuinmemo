@@ -8,6 +8,10 @@
 - `schema.sql` — Neon PostgreSQL 用スキーマ
 - `templates/index.html` — 編集用フロントエンド（エントリ一覧・Markdownエディタ・グラフ）。`/edit`で配信
 - `templates/view.html` — 主治医閲覧用の読み取り専用ページ（編集フォームなし、コピー・グラフ画像ダウンロードボタン付き）。ルート`/`で配信
+- `static/theme.css` — 両ページ共通のデザイントークン・カード/ボタン/idle fade などの共通CSS
+- `static/idle-ui.js` — 無操作が続くと副次的なUI（ナビリンクや期間トグルなど）を減光させる共通スクリプト
+- `static/vitals-chart.js` — 睡眠・歩数グラフの日付バケット化とChart.js描画ロジック（編集/閲覧ページ共通）
+- `static/markdown-editor.js` — Markdownエディタの箇条書き・見出し自動補完、Tabインデント、Alt+↑/↓行入れ替え
 - `static/manifest.json` / `static/sw.js` / `static/icons/` — PWA（ホーム画面追加・簡易オフラインキャッシュ）。`sw.js`はスコープを`/`全体にするため`/sw.js`としても配信される
 - `vercel.json` — 全リクエストを `app.py` に渡す設定（静的ファイル配信もFlask内部のstatic/templateで処理）
 - `requirements.txt` — Python 依存パッケージ
@@ -48,15 +52,18 @@ Vercel プロジェクトの環境変数に `DATABASE_URL` を設定してくだ
 | GET | `/api/memo?limit=200` | 直近N件のメモ一覧（エントリ一覧用、デフォルト200件・最大500件） |
 | POST | `/api/memo` | メモの作成/更新（日付でupsert） |
 | GET / PUT / DELETE | `/api/memo/<id>` | ID指定での取得・更新・削除 |
-| GET | `/api/vitals?start=YYYY-MM-DD&end=YYYY-MM-DD` | 睡眠・歩数データ取得（省略時は直近31日） |
+| GET | `/api/vitals?start=YYYY-MM-DD&end=YYYY-MM-DD` | 睡眠・歩数データ取得（省略時は直近50日） |
 | POST | `/api/vitals/import-csv` | CSVインポート（`type=sleep`\|`steps`, `file`） |
 
 CSVは `date`/`day`/`timestamp` 列と `duration`/`sleep`(分)/`steps` 列を、大文字小文字を問わず部分一致で自動検出します（例: `Timestamp` + `Steps (steps)` / `Timestamp` + `Sleep duration`）。
 
-バイタルグラフは「直近31日」「週次」「月次」を切り替えられます。週次・月次は範囲内の平均値（歩数は平均歩数/日、睡眠は平均時間/日）を表示し、通院日を含む期間はオレンジ色でハイライトされます。
+バイタルグラフは「直近50日」「週次」「月次」を切り替えられます。週次・月次は範囲内の平均値（歩数は平均歩数/日、睡眠は平均時間/日）を表示し、通院日を含む期間はオレンジ色でハイライトされます。「通院日」はエントリが存在する日を自動的にそう扱う仕様で、`is_clinic_day` は常に `true` を返します（別途チェックボックスでの指定はありません）。
 
 ## メモ
 
 - Markdownの4セクション（生活変化・体調・今後の意向・質問相談依頼）はエディタの「4セクション挿入」ボタンで挿入されるテンプレートで、強制ではありません。
-- オフライン時は入力内容を `localStorage` に下書き保存し、オンライン復帰時に自動同期します。
+- Markdownエディタは「`- `で箇条書き継続」「`#`で見出し自動補完」「Tab/Shift+Tabでインデント」「Alt+↑/↓で行入れ替え」に対応しています（`static/markdown-editor.js`）。
+- 本文中の `![alt](URL)` 形式の画像は「画像を結合保存」ボタンで縦に1枚のPNGへ結合してダウンロードできます。
+- サマリ・本文は入力停止後に自動保存されます（保存ボタンはありません）。オフライン時は `localStorage` に下書き保存し、オンライン復帰時に自動同期します。
+- エントリの削除はエントリ一覧の各行にある🗑ボタンから行います。
 - `/api/cleanup` のような自動削除機能は、実データ喪失リスクがあるため今回は未実装です。

@@ -1,0 +1,187 @@
+/* Shared design tokens + base chrome for 通院メモ (edit + view pages). */
+
+:root {
+  --bg: #f3f5f8;
+  --bg-elevated: #ffffff;
+  --card-bg: #ffffff;
+  --border: #e2e6ec;
+  --border-soft: #edf0f4;
+  --text: #1c222b;
+  --text-dim: #667085;
+  --text-faint: #98a2b3;
+  --accent: #3a6ea5;
+  --accent-hover: #2f5c8a;
+  --accent-dim: #eaf1f8;
+  --accent-soft: #d7e6f4;
+  --danger: #c0392b;
+  --danger-dim: #fbeceb;
+  --success: #2f8f5b;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow-md: 0 6px 20px rgba(16, 24, 40, 0.08);
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --t-fast: 0.15s var(--ease);
+  --t: 0.25s var(--ease);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12151a;
+    --bg-elevated: #1a1e25;
+    --card-bg: #1a1e25;
+    --border: #2a2f39;
+    --border-soft: #232833;
+    --text: #e7eaef;
+    --text-dim: #9aa4b3;
+    --text-faint: #6b7481;
+    --accent: #6ba3db;
+    --accent-hover: #8bb8e4;
+    --accent-dim: #1e2b3c;
+    --accent-soft: #26364a;
+    --danger: #e3776a;
+    --danger-dim: #3a2422;
+    --success: #57b787;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+    --shadow-md: 0 10px 28px rgba(0, 0, 0, 0.45);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--accent-soft); }
+
+/* ---------------------------------------------------------------------
+   Header
+--------------------------------------------------------------------- */
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 20px;
+  background: var(--accent);
+  color: #fff;
+  gap: 10px;
+  flex-wrap: wrap;
+  transition: background var(--t);
+}
+header h1 { font-size: 1.02rem; margin: 0; font-weight: 600; letter-spacing: 0.01em; }
+header .header-right { display: flex; align-items: center; gap: 10px; }
+header a.nav-link {
+  color: #fff;
+  font-size: 0.8rem;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 999px;
+  padding: 4px 12px;
+  transition: background var(--t-fast), opacity var(--t);
+  white-space: nowrap;
+}
+header a.nav-link:hover { background: rgba(255, 255, 255, 0.16); }
+#statusBadge {
+  font-size: 0.72rem;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  transition: background var(--t-fast), opacity var(--t);
+}
+#statusBadge.offline { background: #c0392b; }
+
+/* ---------------------------------------------------------------------
+   Cards + buttons (shared vocabulary)
+--------------------------------------------------------------------- */
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  transition: background var(--t), border-color var(--t), box-shadow var(--t);
+}
+.card h2 {
+  font-size: 0.92rem;
+  margin: 0 0 12px;
+  color: var(--text-dim);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.btn {
+  display: inline-block;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 7px 14px;
+  font-size: 0.84rem;
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: none;
+  transition: background var(--t-fast), opacity var(--t-fast), transform var(--t-fast);
+}
+.btn:hover { background: var(--accent-hover); }
+.btn:active { transform: scale(0.97); }
+.btn.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+.btn.secondary:hover { background: var(--accent-dim); }
+.btn.danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+.btn.danger:hover { background: var(--danger-dim); }
+.btn.active { background: var(--accent); color: #fff; }
+.btn:disabled { opacity: 0.5; cursor: default; }
+
+.period-toggle { display: flex; gap: 6px; }
+
+input[type=text], input[type=date], textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  background: var(--bg-elevated);
+  color: var(--text);
+  transition: border-color var(--t-fast), background var(--t);
+}
+input[type=text]:focus, input[type=date]:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ---------------------------------------------------------------------
+   Idle chrome: after a few seconds of no input, secondary controls
+   recede so the content itself has the floor. Never fully invisible,
+   so touch users without hover can still find + tap them.
+--------------------------------------------------------------------- */
+
+.ui-fade { transition: opacity var(--t); }
+body.ui-idle .ui-fade { opacity: 0.4; }
+.ui-fade:hover, .ui-fade:focus-within { opacity: 1; }
+
+/* Dim blocks unrelated to the thing currently being written. */
+.fade-on-editor-focus { transition: opacity var(--t); }
+body.editor-focused .fade-on-editor-focus { opacity: 0.45; }
+
+/* Landing-spot flash so a jump (date pick, list click) is visible. */
+@keyframes jump-highlight {
+  0% { background-color: var(--accent-soft); }
+  100% { background-color: transparent; }
+}
+.jump-highlight { animation: jump-highlight 1.3s var(--ease); }
+
+footer { text-align: center; font-size: 0.7rem; color: var(--text-faint); padding: 18px; }
+footer a { color: var(--text-faint); }
+
+.hint { font-size: 0.75rem; color: var(--text-faint); margin-top: 6px; }
+.empty-hint { color: var(--text-dim); font-size: 0.85rem; padding: 10px 0; }

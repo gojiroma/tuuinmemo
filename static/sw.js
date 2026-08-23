@@ -1,10 +1,14 @@
-const CACHE_NAME = 'tuuinmemo-shell-v1';
+const CACHE_NAME = 'tuuinmemo-shell-v2';
 const SHELL_FILES = [
   '/edit',
   '/static/manifest.json',
   '/static/icons/icon-192.png',
   '/static/icons/icon-512.png',
   '/static/icons/apple-touch-icon.png',
+  '/static/theme.css',
+  '/static/idle-ui.js',
+  '/static/vitals-chart.js',
+  '/static/markdown-editor.js',
 ];
 
 self.addEventListener('install', event => {
