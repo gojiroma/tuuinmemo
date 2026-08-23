@@ -57,12 +57,20 @@
     return `${y}/${Number(m)}`;
   }
 
-  const RECENT_DAYS = 50;
+  const RECENT_DAYS = 50; // default for the plain 'recent' mode (kept for backward compat)
   const MONTHLY_START = '2025-12-01';
+
+  // 'recent' == 50 days; 'recentNNN' (e.g. 'recent100') == NNN days.
+  function recentModeDays(mode) {
+    if (mode === 'recent') return RECENT_DAYS;
+    const m = /^recent(\d+)$/.exec(mode);
+    return m ? Number(m[1]) : null;
+  }
 
   function vitalsRangeForMode(mode) {
     const end = fmtDate(new Date());
-    if (mode === 'recent') return { start: addDays(end, -(RECENT_DAYS - 1)), end };
+    const recentDays = recentModeDays(mode);
+    if (recentDays) return { start: addDays(end, -(recentDays - 1)), end };
     if (mode === 'week') return { start: addDays(end, -7 * 12 + 1), end };
     return { start: MONTHLY_START, end }; // month: fixed start, not a rolling window
   }
@@ -70,7 +78,7 @@
   // Every bucket key in [start, end] for the given mode, so bar/line series stay aligned.
   function bucketKeysForRange(mode, start, end) {
     const keys = [];
-    if (mode === 'recent') {
+    if (recentModeDays(mode)) {
       for (let d = start; d <= end; d = addDays(d, 1)) keys.push(d);
     } else if (mode === 'week') {
       const last = weekStart(end);
@@ -120,7 +128,8 @@
 
     if (existingChart) existingChart.destroy();
 
-    const modeTitle = mode === 'recent' ? `（直近${RECENT_DAYS}日）` : mode === 'week' ? '（週平均）' : '（月平均）';
+    const recentDays = recentModeDays(mode);
+    const modeTitle = recentDays ? `（直近${recentDays}日）` : mode === 'week' ? '（週平均）' : '（月平均）';
 
     return new Chart(canvasEl, {
       data: {
@@ -149,7 +158,30 @@
       options: {
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: true },
+          legend: {
+            display: true,
+            labels: {
+              // Append a swatch-only entry explaining the orange highlight,
+              // since it isn't a real dataset of its own.
+              generateLabels(chart) {
+                const items = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+                items.push({
+                  text: '通院日',
+                  fillStyle: '#e0793a',
+                  strokeStyle: '#e0793a',
+                  lineWidth: 0,
+                  hidden: false,
+                });
+                return items;
+              },
+            },
+            onClick(e, legendItem, legend) {
+              // The 通院日 swatch has no dataset behind it — ignore clicks on it
+              // instead of letting Chart.js's default handler throw.
+              if (legendItem.datasetIndex === undefined) return;
+              Chart.defaults.plugins.legend.onClick.call(legend, e, legendItem, legend);
+            },
+          },
           title: { display: true, text: `睡眠・歩数${modeTitle}` },
         },
         scales: {
