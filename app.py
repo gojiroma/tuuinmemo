@@ -17,6 +17,23 @@ def get_conn():
     return psycopg2.connect(DATABASE_URL)
 
 
+def init_db():
+    schema_path = os.path.join(os.path.dirname(__file__), "schema.sql")
+    with open(schema_path, "r", encoding="utf-8") as f:
+        schema_sql = f.read()
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(schema_sql)  # CREATE ... IF NOT EXISTS なので既存データは消えない
+        conn.commit()
+
+
+if DATABASE_URL:
+    try:
+        init_db()
+    except Exception as e:
+        print(f"[init_db] schema initialization failed: {e}")
+
+
 # ---------------------------------------------------------------------------
 # Frontend
 # ---------------------------------------------------------------------------
