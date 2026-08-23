@@ -4,10 +4,10 @@
 
 ## 構成
 
-- `app.py` — Flask アプリ本体（`/`・`/view` のページ配信 + `/api/*` の全エンドポイント）
+- `app.py` — Flask アプリ本体（`/`・`/edit` のページ配信 + `/api/*` の全エンドポイント）
 - `schema.sql` — Neon PostgreSQL 用スキーマ
-- `templates/index.html` — 編集用フロントエンド（エントリ一覧・Markdownエディタ・グラフ）。`/`で配信
-- `templates/view.html` — 主治医閲覧用の読み取り専用ページ（編集フォームなし、Markdownコピー用ボタン付き）。`/view`で配信
+- `templates/index.html` — 編集用フロントエンド（エントリ一覧・Markdownエディタ・グラフ）。`/edit`で配信
+- `templates/view.html` — 主治医閲覧用の読み取り専用ページ（編集フォームなし、コピー・グラフ画像ダウンロードボタン付き）。ルート`/`で配信
 - `static/manifest.json` / `static/sw.js` / `static/icons/` — PWA（ホーム画面追加・簡易オフラインキャッシュ）。`sw.js`はスコープを`/`全体にするため`/sw.js`としても配信される
 - `vercel.json` — 全リクエストを `app.py` に渡す設定（静的ファイル配信もFlask内部のstatic/templateで処理）
 - `requirements.txt` — Python 依存パッケージ
@@ -38,7 +38,7 @@ vercel
 
 Vercel プロジェクトの環境変数に `DATABASE_URL` を設定してください。
 
-`/` は編集用、`/view` は主治医に見せる読み取り専用ページです（同じ非公開URL運用・認証なしの想定。`/view`はフォームや削除ボタンがなく、各記録に「Markdownをコピー」ボタンがあります）。
+ルート`/`は主治医に見せる読み取り専用ページ、`/edit`が編集用ページです（同じ非公開URL運用・認証なしの想定。`/`はフォームや削除ボタンがなく、各記録に「メモをコピー」ボタンがあります）。両ページのヘッダーからお互いに移動できます。PWAとしてホーム画面に追加した場合の起動先は`/edit`です。
 
 ## API
 

@@ -39,13 +39,13 @@ if DATABASE_URL:
 # ---------------------------------------------------------------------------
 
 @app.route("/")
-def index():
-    return render_template("index.html")
-
-
-@app.route("/view")
 def doctor_view():
     return render_template("view.html")
+
+
+@app.route("/edit")
+def index():
+    return render_template("index.html")
 
 
 @app.route("/sw.js")

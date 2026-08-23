@@ -1,6 +1,6 @@
 const CACHE_NAME = 'tuuinmemo-shell-v1';
 const SHELL_FILES = [
-  '/',
+  '/edit',
   '/static/manifest.json',
   '/static/icons/icon-192.png',
   '/static/icons/icon-512.png',
