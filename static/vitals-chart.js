@@ -58,12 +58,13 @@
   }
 
   const RECENT_DAYS = 50;
+  const MONTHLY_START = '2025-12-01';
 
   function vitalsRangeForMode(mode) {
     const end = fmtDate(new Date());
     if (mode === 'recent') return { start: addDays(end, -(RECENT_DAYS - 1)), end };
     if (mode === 'week') return { start: addDays(end, -7 * 12 + 1), end };
-    return { start: addDays(end, -365), end }; // month: ~12 months back
+    return { start: MONTHLY_START, end }; // month: fixed start, not a rolling window
   }
 
   // Every bucket key in [start, end] for the given mode, so bar/line series stay aligned.
