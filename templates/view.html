@@ -70,7 +70,6 @@
   .detail-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
   .selected-date-label { font-weight: 700; font-size: 1.1rem; }
   .selected-date-weekday { font-size: 0.85rem; color: var(--text-dim); }
-  .detail-summary { color: var(--text-dim); font-size: 0.9rem; }
   .entry-content { line-height: 1.6; }
   .entry-content h2 { font-size: 0.95rem; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
   .entry-content :first-child { margin-top: 0; }
@@ -113,7 +112,6 @@
         <span class="selected-date-label" id="selectedDateLabel"></span>
         <span class="selected-date-weekday" id="selectedDateWeekday"></span>
       </div>
-      <div class="detail-summary" id="detailSummary"></div>
       <div class="entry-content" id="detailContent"></div>
       <div>
         <button class="btn secondary copy-btn" id="copyBtn">メモをコピー</button>
@@ -142,6 +140,12 @@ function fmtDate(d) { return VitalsChart.fmtDate(d); }
 function weekdayLabel(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
   return WEEKDAY_JA[d.getDay()];
+}
+
+function firstLine(content) {
+  if (!content) return '';
+  const line = (content.split('\n').find(l => l.trim()) || '');
+  return line.replace(/^#+\s*/, '').replace(/^-\s*/, '').trim();
 }
 
 async function apiGet(url) {
@@ -221,10 +225,11 @@ function renderEntryList() {
     }
     row.appendChild(top);
 
-    if (m.summary) {
+    const preview = firstLine(m.content);
+    if (preview) {
       const summary = document.createElement('div');
       summary.className = 'entry-summary';
-      summary.textContent = m.summary;
+      summary.textContent = preview;
       row.appendChild(summary);
     }
 
@@ -253,7 +258,6 @@ function renderDetail() {
   if (!memo) {
     document.getElementById('selectedDateLabel').textContent = '';
     document.getElementById('selectedDateWeekday').textContent = '';
-    document.getElementById('detailSummary').textContent = '';
     document.getElementById('detailContent').innerHTML = '<p class="empty-hint">記録を選択してください。</p>';
     document.getElementById('copyBtn').style.display = 'none';
     return;
@@ -261,7 +265,6 @@ function renderDetail() {
 
   document.getElementById('selectedDateLabel').textContent = memo.date;
   document.getElementById('selectedDateWeekday').textContent = `(${weekdayLabel(memo.date)})`;
-  document.getElementById('detailSummary').textContent = memo.summary || '';
   document.getElementById('detailContent').innerHTML = (memo.content || '').trim()
     ? marked.parse(memo.content)
     : '<p style="color:var(--text-faint);">（内容なし）</p>';

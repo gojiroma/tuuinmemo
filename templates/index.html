@@ -92,14 +92,6 @@
   .editor-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
   .selected-date-label { font-weight: 700; font-size: 1.1rem; }
   .selected-date-weekday { font-size: 0.85rem; color: var(--text-dim); }
-  #summaryInput {
-    border: none;
-    border-bottom: 1px solid var(--border-soft);
-    border-radius: 0;
-    padding: 4px 2px;
-    background: transparent;
-  }
-  #summaryInput:focus { border-bottom-color: var(--accent); }
 
   .editor-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; }
   .editor-toolbar .group { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -166,7 +158,6 @@
       <span class="selected-date-label" id="selectedDateLabel"></span>
       <span class="selected-date-weekday" id="selectedDateWeekday"></span>
     </div>
-    <input type="text" id="summaryInput" placeholder="サマリ（今日のひとこと要約）">
 
     <div class="editor-toolbar">
       <h2 style="margin:0;">📝 Markdown メモ</h2>
@@ -382,7 +373,7 @@ function renderEntryList() {
 
     const preview = document.createElement('div');
     preview.className = 'entry-summary';
-    preview.textContent = m.summary || firstLine(m.content) || '（内容なし）';
+    preview.textContent = firstLine(m.content) || '（内容なし）';
     main.appendChild(preview);
 
     row.appendChild(main);
@@ -435,10 +426,9 @@ function loadEditorForSelectedDate() {
   const memo = state.entriesByDate[dateStr];
   const draft = getDraft(dateStr);
 
-  const base = draft || memo || { summary: '', content: '' };
+  const base = draft || memo || { content: '' };
   state.currentMemoId = memo ? memo.id : null;
 
-  document.getElementById('summaryInput').value = base.summary || '';
   document.getElementById('contentEdit').value = base.content || '';
 
   setSaveStatus(draft ? '未同期の下書きがあります' : '', draft ? 'offline' : '');
@@ -469,9 +459,10 @@ function setSaveStatus(text, kind) {
 }
 
 function currentFormData() {
+  const content = document.getElementById('contentEdit').value;
   return {
-    summary: document.getElementById('summaryInput').value,
-    content: document.getElementById('contentEdit').value,
+    summary: firstLine(content), // one-line summary is just the first heading/line, not a separate field
+    content,
   };
 }
 
@@ -491,7 +482,7 @@ async function autosaveNow() {
   const dateStr = state.selectedDate;
   const payload = currentFormData();
 
-  if (!payload.summary && !payload.content && !state.currentMemoId) {
+  if (!payload.content && !state.currentMemoId) {
     clearDraft(dateStr);
     setSaveStatus('', '');
     return;
@@ -524,7 +515,6 @@ async function autosaveNow() {
   }
 }
 
-document.getElementById('summaryInput').addEventListener('input', onFormInput);
 document.getElementById('contentEdit').addEventListener('input', onFormInput);
 document.getElementById('contentEdit').addEventListener('input', updatePreview);
 document.getElementById('contentEdit').addEventListener('keydown', function (e) {
@@ -560,7 +550,6 @@ async function deleteEntry(dateStr) {
   }
 
   if (state.selectedDate === dateStr) {
-    document.getElementById('summaryInput').value = '';
     document.getElementById('contentEdit').value = '';
     state.currentMemoId = null;
     setSaveStatus('削除しました', '');
