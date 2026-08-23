@@ -8,6 +8,7 @@
 <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <style>
   :root {
     --bg: #f4f6f8;
@@ -76,6 +77,7 @@
   .entry-content :first-child { margin-top: 0; }
   .entry-actions { margin-top: 8px; }
   .copy-btn { font-size: 0.78rem; padding: 5px 12px; }
+  .download-row { margin-top: 12px; }
   .empty-hint { color: var(--text-dim); font-size: 0.85rem; padding: 10px 0; }
   footer { text-align: center; font-size: 0.7rem; color: var(--text-dim); padding: 16px; }
   footer a { color: var(--text-dim); }
@@ -94,9 +96,14 @@
         <button class="btn secondary" data-mode="month">月次</button>
       </div>
     </div>
-    <div class="charts-row">
-      <div class="chart-box"><canvas id="sleepChart"></canvas></div>
-      <div class="chart-box"><canvas id="stepsChart"></canvas></div>
+    <div id="chartsContainer">
+      <div class="charts-row">
+        <div class="chart-box"><canvas id="sleepChart"></canvas></div>
+        <div class="chart-box"><canvas id="stepsChart"></canvas></div>
+      </div>
+    </div>
+    <div class="download-row">
+      <button class="btn secondary" id="downloadChartImageBtn">🖼 グラフを画像としてダウンロード</button>
     </div>
   </div>
 
@@ -186,7 +193,7 @@ function renderEntries() {
     actions.className = 'entry-actions';
     const copyBtn = document.createElement('button');
     copyBtn.className = 'btn secondary copy-btn';
-    copyBtn.textContent = 'Markdownをコピー';
+    copyBtn.textContent = 'メモをコピー';
     copyBtn.addEventListener('click', () => copyToClipboard(m.content, copyBtn));
     actions.appendChild(copyBtn);
     card.appendChild(actions);
@@ -311,6 +318,15 @@ document.querySelectorAll('.period-toggle [data-mode]').forEach(btn => {
     state.vitalsMode = btn.dataset.mode;
     document.querySelectorAll('.period-toggle [data-mode]').forEach(b => b.classList.toggle('active', b === btn));
     loadVitals();
+  });
+});
+
+document.getElementById('downloadChartImageBtn').addEventListener('click', () => {
+  html2canvas(document.getElementById('chartsContainer')).then(canvas => {
+    const link = document.createElement('a');
+    link.download = `vitals_${state.vitalsMode}_${fmtDate(new Date())}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
   });
 });
 
