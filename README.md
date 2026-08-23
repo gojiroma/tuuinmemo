@@ -4,11 +4,11 @@
 
 ## 構成
 
-- `api/index.py` — Flask アプリ本体（`/api/*` の全エンドポイント）
+- `app.py` — Flask アプリ本体（`/` のページ配信 + `/api/*` の全エンドポイント）
 - `schema.sql` — Neon PostgreSQL 用スキーマ
-- `index.html` — フロントエンド（カレンダー・Markdownエディタ・グラフ）
-- `manifest.json` / `sw.js` / `icons/` — PWA（ホーム画面追加・簡易オフラインキャッシュ）
-- `vercel.json` — `/api/*` を Flask に、それ以外を静的ファイルとして配信する設定
+- `templates/index.html` — フロントエンド（カレンダー・Markdownエディタ・グラフ、`render_template`で配信）
+- `static/manifest.json` / `static/sw.js` / `static/icons/` — PWA（ホーム画面追加・簡易オフラインキャッシュ）。`sw.js`はスコープを`/`全体にするため`/sw.js`としても配信される
+- `vercel.json` — 全リクエストを `app.py` に渡す設定（静的ファイル配信もFlask内部のstatic/templateで処理）
 - `requirements.txt` — Python 依存パッケージ
 
 ## セットアップ
@@ -26,12 +26,8 @@ psql "$DATABASE_URL" -f schema.sql
 ```bash
 pip install -r requirements.txt
 export DATABASE_URL="postgresql://user:pass@host/db"
-python3 api/index.py   # http://127.0.0.1:5000
+python3 app.py   # http://127.0.0.1:5000
 ```
-
-`index.html` を同じオリジンから配信する場合は、`python3 -m http.server` 等で別途配信するか、
-そのまま `api/index.py` にリクエストしつつブラウザで `index.html` を直接開いて `fetch` 先を調整してください。
-（Vercel 上ではどちらも同一オリジンになるため、この調整は不要です。）
 
 ### 3. Vercel にデプロイ
 

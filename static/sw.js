@@ -1,11 +1,10 @@
 const CACHE_NAME = 'tuuinmemo-shell-v1';
 const SHELL_FILES = [
-  './',
-  'index.html',
-  'manifest.json',
-  'icons/icon-192.png',
-  'icons/icon-512.png',
-  'icons/apple-touch-icon.png',
+  '/',
+  '/static/manifest.json',
+  '/static/icons/icon-192.png',
+  '/static/icons/icon-512.png',
+  '/static/icons/apple-touch-icon.png',
 ];
 
 self.addEventListener('install', event => {

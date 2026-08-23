@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 
 import psycopg2
 import psycopg2.extras
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template, send_from_directory
 
 app = Flask(__name__)
 
@@ -15,6 +15,21 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 def get_conn():
     return psycopg2.connect(DATABASE_URL)
+
+
+# ---------------------------------------------------------------------------
+# Frontend
+# ---------------------------------------------------------------------------
+
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+
+@app.route("/sw.js")
+def service_worker():
+    # served from the root path (not /static/sw.js) so its default scope covers the whole app
+    return send_from_directory(app.static_folder, "sw.js", mimetype="application/javascript")
 
 
 def row_to_memo(row):
