@@ -57,18 +57,6 @@
     return `${y}/${Number(m)}`;
   }
 
-  // A few non-empty lines from a memo's markdown, stripped of leading
-  // "#"/"-" markers and truncated, for a compact hover preview.
-  function memoPreviewLines(content, maxLines, maxChars) {
-    if (!content) return [];
-    return content
-      .split('\n')
-      .map(l => l.replace(/^#+\s*/, '').replace(/^-\s*/, '').trim())
-      .filter(Boolean)
-      .slice(0, maxLines)
-      .map(l => (l.length > maxChars ? l.slice(0, maxChars - 1) + '…' : l));
-  }
-
   const RECENT_DAYS = 50; // default for the plain 'recent' mode (kept for backward compat)
   const MONTHLY_START = '2025-12-01';
 
@@ -128,7 +116,10 @@
   }
 
   // entries: memo rows (every entry counts as a clinic-day marker).
-  function renderVitalsChart(canvasEl, existingChart, entries, vitals, mode) {
+  // onHoverEntry(memo), optional: called when the cursor lands on a bucket
+  // that has a memo (daily-resolution modes only), so the caller can select
+  // that entry into its own entry list / detail view.
+  function renderVitalsChart(canvasEl, existingChart, entries, vitals, mode, onHoverEntry) {
     const { start, end } = vitalsRangeForMode(mode);
     const keys = bucketKeysForRange(mode, start, end);
     const clinicDates = new Set(
@@ -144,10 +135,11 @@
     const modeTitle = recentDays ? `（直近${recentDays}日）` : mode === 'week' ? '（週平均）' : '（月平均）';
 
     // Only daily-resolution modes map one bucket key to exactly one calendar
-    // date, so the memo hover preview is limited to those (week/month
+    // date, so the hover-to-select handoff is limited to those (week/month
     // buckets can span several entries and don't have a single memo to show).
     const entriesByDate = {};
     if (recentDays) entries.forEach(m => { entriesByDate[m.date] = m; });
+    let lastHoverIndex = null;
 
     return new Chart(canvasEl, {
       data: {
@@ -201,22 +193,21 @@
             },
           },
           title: { display: true, text: `睡眠・歩数${modeTitle}` },
-          tooltip: {
-            callbacks: {
-              // Show the memo for a clinic day right in the tooltip when the
-              // cursor lands on that date, instead of making the viewer go
-              // hunt for it in the entry list.
-              afterBody(items) {
-                if (!recentDays || !items.length) return [];
-                const memo = entriesByDate[keys[items[0].dataIndex]];
-                if (!memo) return [];
-                const header = `📝 ${memo.date}${memo.summary ? '  ' + memo.summary : ''}`;
-                return [''].concat([header], memoPreviewLines(memo.content, 3, 42));
-              },
-            },
-          },
         },
         interaction: { mode: 'index', intersect: false },
+        // Hovering a clinic day hands its memo off to the caller (to select
+        // into the entry list / detail pane) rather than showing it in the
+        // chart itself. Only fires on the index actually changing, so a
+        // stray pass over the canvas doesn't spam re-selection.
+        onHover(event, activeElements) {
+          if (!recentDays || typeof onHoverEntry !== 'function') return;
+          if (!activeElements.length) { lastHoverIndex = null; return; }
+          const idx = activeElements[0].index;
+          if (idx === lastHoverIndex) return;
+          lastHoverIndex = idx;
+          const memo = entriesByDate[keys[idx]];
+          if (memo) onHoverEntry(memo);
+        },
         scales: {
           ySteps: { type: 'linear', position: 'left', beginAtZero: true, title: { display: true, text: '歩数' } },
           ySleep: { type: 'linear', position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, title: { display: true, text: '睡眠(時間)' } },

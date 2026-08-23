@@ -198,6 +198,7 @@ function renderEntryList() {
     row.className = 'entry-row';
     if (m.date === state.selectedDate) row.classList.add('selected');
     row.addEventListener('click', () => selectEntry(m.date));
+    row.addEventListener('mouseenter', () => selectEntry(m.date));
 
     const top = document.createElement('div');
     top.className = 'entry-top';
@@ -239,6 +240,7 @@ function flashJumpHighlight() {
 }
 
 function selectEntry(dateStr) {
+  if (dateStr === state.selectedDate) return; // already showing it (e.g. hover re-entering the same row)
   state.selectedDate = dateStr;
   renderEntryList();
   renderDetail();
@@ -279,7 +281,8 @@ function renderCharts() {
     vitalsChart,
     state.entries,
     state.vitals,
-    state.vitalsMode
+    state.vitalsMode,
+    memo => selectEntry(memo.date) // hovering a clinic day loads it into the detail pane
   );
 }
 

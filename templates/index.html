@@ -357,6 +357,7 @@ function renderEntryList() {
     const main = document.createElement('div');
     main.className = 'entry-main';
     main.addEventListener('click', () => selectDate(m.date));
+    main.addEventListener('mouseenter', () => selectDate(m.date));
 
     const top = document.createElement('div');
     top.className = 'entry-top';
@@ -409,6 +410,17 @@ function flashJumpHighlight() {
 }
 
 function selectDate(dateStr) {
+  if (dateStr === state.selectedDate) return; // already showing it (e.g. hover re-entering the same row)
+
+  if (autosaveTimer) {
+    // A hover (list row or chart) can switch the shown entry before the
+    // debounce fires — flush whatever was just typed under the old date
+    // first so it isn't silently dropped.
+    clearTimeout(autosaveTimer);
+    autosaveTimer = null;
+    autosaveNow();
+  }
+
   state.selectedDate = dateStr;
   document.getElementById('jumpDateInput').value = dateStr;
   renderEntryList();
@@ -636,7 +648,8 @@ function renderCharts() {
     vitalsChart,
     state.entries,
     state.vitals,
-    state.vitalsMode
+    state.vitalsMode,
+    memo => selectDate(memo.date) // hovering a clinic day loads it into the editor
   );
 }
 
