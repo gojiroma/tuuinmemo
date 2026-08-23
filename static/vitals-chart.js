@@ -57,6 +57,18 @@
     return `${y}/${Number(m)}`;
   }
 
+  // A few non-empty lines from a memo's markdown, stripped of leading
+  // "#"/"-" markers and truncated, for a compact hover preview.
+  function memoPreviewLines(content, maxLines, maxChars) {
+    if (!content) return [];
+    return content
+      .split('\n')
+      .map(l => l.replace(/^#+\s*/, '').replace(/^-\s*/, '').trim())
+      .filter(Boolean)
+      .slice(0, maxLines)
+      .map(l => (l.length > maxChars ? l.slice(0, maxChars - 1) + '…' : l));
+  }
+
   const RECENT_DAYS = 50; // default for the plain 'recent' mode (kept for backward compat)
   const MONTHLY_START = '2025-12-01';
 
@@ -131,6 +143,12 @@
     const recentDays = recentModeDays(mode);
     const modeTitle = recentDays ? `（直近${recentDays}日）` : mode === 'week' ? '（週平均）' : '（月平均）';
 
+    // Only daily-resolution modes map one bucket key to exactly one calendar
+    // date, so the memo hover preview is limited to those (week/month
+    // buckets can span several entries and don't have a single memo to show).
+    const entriesByDate = {};
+    if (recentDays) entries.forEach(m => { entriesByDate[m.date] = m; });
+
     return new Chart(canvasEl, {
       data: {
         labels: stepsSeries.labels,
@@ -183,7 +201,22 @@
             },
           },
           title: { display: true, text: `睡眠・歩数${modeTitle}` },
+          tooltip: {
+            callbacks: {
+              // Show the memo for a clinic day right in the tooltip when the
+              // cursor lands on that date, instead of making the viewer go
+              // hunt for it in the entry list.
+              afterBody(items) {
+                if (!recentDays || !items.length) return [];
+                const memo = entriesByDate[keys[items[0].dataIndex]];
+                if (!memo) return [];
+                const header = `📝 ${memo.date}${memo.summary ? '  ' + memo.summary : ''}`;
+                return [''].concat([header], memoPreviewLines(memo.content, 3, 42));
+              },
+            },
+          },
         },
+        interaction: { mode: 'index', intersect: false },
         scales: {
           ySteps: { type: 'linear', position: 'left', beginAtZero: true, title: { display: true, text: '歩数' } },
           ySleep: { type: 'linear', position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, title: { display: true, text: '睡眠(時間)' } },

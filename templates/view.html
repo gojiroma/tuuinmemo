@@ -14,31 +14,67 @@
   .wrap { max-width: 1180px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
   .chart-box { height: 400px; position: relative; }
   #chartsContainer { background: var(--bg-elevated); padding: 8px; border-radius: var(--radius-sm); transition: background var(--t); }
+  .download-row { margin-top: 12px; }
 
-  .entries-grid {
+  /* Record section: entry list (left) + selected entry detail (right),
+     mirroring the edit page's layout. */
+  .app {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 14px;
+    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
   }
-  @media (max-width: 700px) {
-    .entries-grid { grid-template-columns: 1fr; }
+  @media (max-width: 860px) {
+    .app { grid-template-columns: 1fr; }
   }
-  .entry-card {
-    border: 1px solid var(--border);
+
+  .entry-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    max-height: 560px;
+    overflow-y: auto;
+    margin: -2px;
+    padding: 2px;
+  }
+  .entry-row {
     border-radius: var(--radius-sm);
-    padding: 14px;
-    transition: border-color var(--t), background var(--t);
+    border: 1px solid transparent;
+    cursor: pointer;
+    padding: 8px 10px;
+    transition: background var(--t-fast), border-color var(--t-fast);
   }
-  .entry-top { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
-  .entry-date { font-weight: 700; font-size: 1rem; }
-  .entry-weekday { font-size: 0.8rem; color: var(--text-faint); }
-  .entry-summary { color: var(--text-dim); font-size: 0.88rem; }
-  .entry-content { line-height: 1.6; margin-top: 8px; }
+  .entry-row:hover { background: var(--accent-dim); }
+  .entry-row.selected { border-color: var(--accent-soft); background: var(--accent-dim); }
+  .entry-top { display: flex; align-items: baseline; gap: 7px; }
+  .entry-date { font-size: 0.85rem; font-weight: 600; }
+  .entry-weekday { font-size: 0.72rem; color: var(--text-faint); }
+  .entry-today {
+    font-size: 0.65rem;
+    color: var(--accent);
+    background: var(--accent-dim);
+    border-radius: 999px;
+    padding: 1px 7px;
+    font-weight: 600;
+  }
+  .entry-summary {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+  }
+
+  .detail-card { display: flex; flex-direction: column; gap: 12px; }
+  .detail-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .selected-date-label { font-weight: 700; font-size: 1.1rem; }
+  .selected-date-weekday { font-size: 0.85rem; color: var(--text-dim); }
+  .detail-summary { color: var(--text-dim); font-size: 0.9rem; }
+  .entry-content { line-height: 1.6; }
   .entry-content h2 { font-size: 0.95rem; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
   .entry-content :first-child { margin-top: 0; }
-  .entry-actions { margin-top: 10px; }
   .copy-btn { font-size: 0.78rem; padding: 5px 12px; }
-  .download-row { margin-top: 12px; }
 </style>
 </head>
 <body>
@@ -66,9 +102,23 @@
     </div>
   </div>
 
-  <div class="card">
-    <h2>記録一覧</h2>
-    <div class="entries-grid" id="entryList"></div>
+  <div class="app">
+    <div class="card">
+      <h2>記録一覧</h2>
+      <div class="entry-list" id="entryList"></div>
+    </div>
+
+    <div class="card detail-card" id="detailCard">
+      <div class="detail-head">
+        <span class="selected-date-label" id="selectedDateLabel"></span>
+        <span class="selected-date-weekday" id="selectedDateWeekday"></span>
+      </div>
+      <div class="detail-summary" id="detailSummary"></div>
+      <div class="entry-content" id="detailContent"></div>
+      <div>
+        <button class="btn secondary copy-btn" id="copyBtn">メモをコピー</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -78,7 +128,13 @@
 <script src="{{ url_for('static', filename='vitals-chart.js') }}"></script>
 <script>
 const WEEKDAY_JA = ['日', '月', '火', '水', '木', '金', '土'];
-const state = { entries: [], vitals: { sleep: [], steps: [] }, vitalsMode: 'recent' };
+const state = {
+  entries: [],
+  entriesByDate: {},
+  selectedDate: null,
+  vitals: { sleep: [], steps: [] },
+  vitalsMode: 'recent',
+};
 let vitalsChart;
 
 function fmtDate(d) { return VitalsChart.fmtDate(d); }
@@ -95,7 +151,7 @@ async function apiGet(url) {
 }
 
 // ---------------------------------------------------------------------
-// Entry list (read-only)
+// Entry list + detail (read-only)
 // ---------------------------------------------------------------------
 
 async function loadEntries() {
@@ -104,7 +160,15 @@ async function loadEntries() {
   } catch (e) {
     state.entries = [];
   }
-  renderEntries();
+  state.entriesByDate = {};
+  state.entries.forEach(m => { state.entriesByDate[m.date] = m; });
+
+  if (!state.selectedDate || !state.entriesByDate[state.selectedDate]) {
+    state.selectedDate = state.entries.length ? state.entries[0].date : null; // most recent (API returns DESC)
+  }
+
+  renderEntryList();
+  renderDetail();
   // loadVitals() runs concurrently and may resolve first — re-render so the
   // clinic-day highlight isn't stuck reflecting an empty entry list.
   renderCharts();
@@ -118,47 +182,91 @@ function copyToClipboard(text, btn) {
   });
 }
 
-function renderEntries() {
+function renderEntryList() {
   const list = document.getElementById('entryList');
   list.innerHTML = '';
 
   if (!state.entries.length) {
-    list.innerHTML = '<div class="empty-hint">まだ記録がありません。</div>';
+    list.innerHTML = '<div class="entry-empty">まだ記録がありません。</div>';
     return;
   }
 
+  const today = fmtDate(new Date());
+
   state.entries.forEach(m => {
-    const card = document.createElement('div');
-    card.className = 'entry-card';
+    const row = document.createElement('div');
+    row.className = 'entry-row';
+    if (m.date === state.selectedDate) row.classList.add('selected');
+    row.addEventListener('click', () => selectEntry(m.date));
 
     const top = document.createElement('div');
     top.className = 'entry-top';
-    top.innerHTML = `<span class="entry-date">${m.date}</span><span class="entry-weekday">(${weekdayLabel(m.date)})</span>`;
-    card.appendChild(top);
+
+    const dateSpan = document.createElement('span');
+    dateSpan.className = 'entry-date';
+    dateSpan.textContent = m.date;
+    top.appendChild(dateSpan);
+
+    const wdSpan = document.createElement('span');
+    wdSpan.className = 'entry-weekday';
+    wdSpan.textContent = weekdayLabel(m.date);
+    top.appendChild(wdSpan);
+
+    if (m.date === today) {
+      const todayTag = document.createElement('span');
+      todayTag.className = 'entry-today';
+      todayTag.textContent = '今日';
+      top.appendChild(todayTag);
+    }
+    row.appendChild(top);
 
     if (m.summary) {
       const summary = document.createElement('div');
       summary.className = 'entry-summary';
       summary.textContent = m.summary;
-      card.appendChild(summary);
+      row.appendChild(summary);
     }
 
-    const content = document.createElement('div');
-    content.className = 'entry-content';
-    content.innerHTML = (m.content || '').trim() ? marked.parse(m.content) : '<p style="color:var(--text-faint);">（内容なし）</p>';
-    card.appendChild(content);
-
-    const actions = document.createElement('div');
-    actions.className = 'entry-actions';
-    const copyBtn = document.createElement('button');
-    copyBtn.className = 'btn secondary copy-btn';
-    copyBtn.textContent = 'メモをコピー';
-    copyBtn.addEventListener('click', () => copyToClipboard(m.content, copyBtn));
-    actions.appendChild(copyBtn);
-    card.appendChild(actions);
-
-    list.appendChild(card);
+    list.appendChild(row);
   });
+}
+
+function flashJumpHighlight() {
+  const card = document.getElementById('detailCard');
+  card.classList.remove('jump-highlight');
+  void card.offsetWidth; // restart animation
+  card.classList.add('jump-highlight');
+}
+
+function selectEntry(dateStr) {
+  state.selectedDate = dateStr;
+  renderEntryList();
+  renderDetail();
+  flashJumpHighlight();
+}
+
+function renderDetail() {
+  const memo = state.selectedDate ? state.entriesByDate[state.selectedDate] : null;
+
+  if (!memo) {
+    document.getElementById('selectedDateLabel').textContent = '';
+    document.getElementById('selectedDateWeekday').textContent = '';
+    document.getElementById('detailSummary').textContent = '';
+    document.getElementById('detailContent').innerHTML = '<p class="empty-hint">記録を選択してください。</p>';
+    document.getElementById('copyBtn').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('selectedDateLabel').textContent = memo.date;
+  document.getElementById('selectedDateWeekday').textContent = `(${weekdayLabel(memo.date)})`;
+  document.getElementById('detailSummary').textContent = memo.summary || '';
+  document.getElementById('detailContent').innerHTML = (memo.content || '').trim()
+    ? marked.parse(memo.content)
+    : '<p style="color:var(--text-faint);">（内容なし）</p>';
+
+  const copyBtn = document.getElementById('copyBtn');
+  copyBtn.style.display = '';
+  copyBtn.onclick = () => copyToClipboard(memo.content, copyBtn);
 }
 
 // ---------------------------------------------------------------------
