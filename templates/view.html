@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>通院メモ（閲覧用）</title>
+<meta name="theme-color" content="#3a6ea5">
+<link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --card-bg: #ffffff;
+    --border: #dde2e7;
+    --text: #22282f;
+    --text-dim: #6b7684;
+    --accent: #3a6ea5;
+    --accent-dim: #e7eef6;
+    --clinic: #e0793a;
+    --clinic-bg: #fdece0;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    padding: 12px 18px;
+    background: var(--accent);
+    color: #fff;
+  }
+  header h1 { font-size: 1.05rem; margin: 0; font-weight: 600; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+  }
+  .card h2 { font-size: 0.95rem; margin: 0 0 10px; color: var(--text-dim); font-weight: 600; }
+  .vitals-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+  .period-toggle { display: flex; gap: 6px; }
+  button.btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 7px 14px;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  button.btn.secondary { background: #fff; color: var(--accent); border: 1px solid var(--accent); }
+  button.btn.active { background: var(--accent); color: #fff; }
+  .charts-row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .charts-row > div { flex: 1 1 380px; min-width: 0; }
+  .chart-box { height: 340px; position: relative; }
+  .entry-card { border-bottom: 1px solid var(--border); padding: 14px 0; }
+  .entry-card:last-child { border-bottom: none; }
+  .entry-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+  .entry-date { font-weight: 700; font-size: 1rem; }
+  .entry-summary { color: var(--text-dim); font-size: 0.88rem; }
+  .badge-clinic {
+    font-size: 0.7rem;
+    background: var(--clinic-bg);
+    color: var(--clinic);
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-weight: 600;
+  }
+  .entry-content { line-height: 1.6; margin-top: 8px; }
+  .entry-content h2 { font-size: 0.95rem; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+  .entry-content :first-child { margin-top: 0; }
+  .entry-actions { margin-top: 8px; }
+  .copy-btn { font-size: 0.78rem; padding: 5px 12px; }
+  .empty-hint { color: var(--text-dim); font-size: 0.85rem; padding: 10px 0; }
+  footer { text-align: center; font-size: 0.7rem; color: var(--text-dim); padding: 16px; }
+  footer a { color: var(--text-dim); }
+</style>
+</head>
+<body>
+<header><h1>🩺 通院メモ（閲覧用）</h1></header>
+
+<div class="wrap">
+  <div class="card">
+    <div class="vitals-toolbar">
+      <h2 style="margin:0;">バイタル（睡眠・歩数）</h2>
+      <div class="period-toggle">
+        <button class="btn secondary" data-mode="31d">直近31日</button>
+        <button class="btn secondary" data-mode="week">週次</button>
+        <button class="btn secondary" data-mode="month">月次</button>
+      </div>
+    </div>
+    <div class="charts-row">
+      <div class="chart-box"><canvas id="sleepChart"></canvas></div>
+      <div class="chart-box"><canvas id="stepsChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>記録一覧</h2>
+    <div id="entryList"></div>
+  </div>
+</div>
+
+<footer>通院メモ（閲覧専用ページ）</footer>
+
+<script>
+const state = { entries: [], vitals: { sleep: [], steps: [] }, vitalsMode: '31d' };
+let sleepChart, stepsChart;
+
+function fmtDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return fmtDate(d);
+}
+
+async function apiGet(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
+  return res.json();
+}
+
+// ---------------------------------------------------------------------
+// Entry list (read-only)
+// ---------------------------------------------------------------------
+
+async function loadEntries() {
+  try {
+    state.entries = await apiGet('/api/memo?limit=200');
+  } catch (e) {
+    state.entries = [];
+  }
+  renderEntries();
+}
+
+function copyToClipboard(text, btn) {
+  navigator.clipboard.writeText(text || '').then(() => {
+    const original = btn.textContent;
+    btn.textContent = 'コピーしました ✓';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  });
+}
+
+function renderEntries() {
+  const list = document.getElementById('entryList');
+  list.innerHTML = '';
+
+  if (!state.entries.length) {
+    list.innerHTML = '<div class="empty-hint">まだ記録がありません。</div>';
+    return;
+  }
+
+  state.entries.forEach(m => {
+    const card = document.createElement('div');
+    card.className = 'entry-card';
+
+    const top = document.createElement('div');
+    top.className = 'entry-top';
+    top.innerHTML = `<span class="entry-date">${m.date}</span>` + (m.is_clinic_day ? '<span class="badge-clinic">通院日</span>' : '');
+    card.appendChild(top);
+
+    if (m.summary) {
+      const summary = document.createElement('div');
+      summary.className = 'entry-summary';
+      summary.textContent = m.summary;
+      card.appendChild(summary);
+    }
+
+    const content = document.createElement('div');
+    content.className = 'entry-content';
+    content.innerHTML = (m.content || '').trim() ? marked.parse(m.content) : '<p style="color:#999;">（内容なし）</p>';
+    card.appendChild(content);
+
+    const actions = document.createElement('div');
+    actions.className = 'entry-actions';
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'btn secondary copy-btn';
+    copyBtn.textContent = 'Markdownをコピー';
+    copyBtn.addEventListener('click', () => copyToClipboard(m.content, copyBtn));
+    actions.appendChild(copyBtn);
+    card.appendChild(actions);
+
+    list.appendChild(card);
+  });
+}
+
+// ---------------------------------------------------------------------
+// Charts (same logic as the editor page)
+// ---------------------------------------------------------------------
+
+function weekStart(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const offset = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - offset);
+  return fmtDate(d);
+}
+
+function monthStart(dateStr) {
+  return dateStr.slice(0, 7) + '-01';
+}
+
+function shortLabel(dateStr) {
+  const [, m, d] = dateStr.split('-');
+  return `${Number(m)}/${Number(d)}`;
+}
+
+function monthLabel(dateStr) {
+  const [y, m] = dateStr.split('-');
+  return `${y}/${Number(m)}`;
+}
+
+function vitalsRangeForMode(mode) {
+  const end = fmtDate(new Date());
+  if (mode === '31d') return { start: addDays(end, -30), end };
+  if (mode === 'week') return { start: addDays(end, -7 * 12 + 1), end };
+  return { start: addDays(end, -365), end };
+}
+
+function buildSeries(rawRows, dateField, valueField, mode, clinicDates, convertFn) {
+  if (mode === '31d') {
+    const byDate = {};
+    rawRows.forEach(r => { byDate[r[dateField]] = r[valueField]; });
+    const { start, end } = vitalsRangeForMode(mode);
+    const labels = [];
+    const values = [];
+    const colors = [];
+    let d = start;
+    while (d <= end) {
+      labels.push(shortLabel(d));
+      const raw = byDate[d];
+      values.push(raw !== undefined ? convertFn(raw) : 0);
+      colors.push(clinicDates.has(d) ? '#e0793a' : null);
+      d = addDays(d, 1);
+    }
+    return { labels, values, colors };
+  }
+
+  const groupFn = mode === 'week' ? weekStart : monthStart;
+  const labelFn = mode === 'week' ? shortLabel : monthLabel;
+  const buckets = {};
+
+  rawRows.forEach(r => {
+    const key = groupFn(r[dateField]);
+    if (!buckets[key]) buckets[key] = { sum: 0, count: 0, clinic: false };
+    buckets[key].sum += r[valueField];
+    buckets[key].count += 1;
+  });
+  clinicDates.forEach(cd => {
+    const key = groupFn(cd);
+    if (buckets[key]) buckets[key].clinic = true;
+  });
+
+  const keys = Object.keys(buckets).sort();
+  return {
+    labels: keys.map(labelFn),
+    values: keys.map(k => convertFn(buckets[k].count ? buckets[k].sum / buckets[k].count : 0)),
+    colors: keys.map(k => buckets[k].clinic ? '#e0793a' : null),
+  };
+}
+
+function renderCharts() {
+  const { start, end } = vitalsRangeForMode(state.vitalsMode);
+  const clinicDates = new Set(
+    state.entries.filter(m => m.is_clinic_day && m.date >= start && m.date <= end).map(m => m.date)
+  );
+
+  const sleepSeries = buildSeries(state.vitals.sleep, 'date', 'duration', state.vitalsMode, clinicDates, v => +(v / 60).toFixed(1));
+  const stepsSeries = buildSeries(state.vitals.steps, 'date', 'steps', state.vitalsMode, clinicDates, v => Math.round(v));
+
+  if (sleepChart) sleepChart.destroy();
+  if (stepsChart) stepsChart.destroy();
+
+  const modeTitle = state.vitalsMode === '31d' ? '' : state.vitalsMode === 'week' ? '（週平均）' : '（月平均）';
+
+  sleepChart = new Chart(document.getElementById('sleepChart'), {
+    type: 'bar',
+    data: { labels: sleepSeries.labels, datasets: [{ label: '睡眠(時間)', data: sleepSeries.values, backgroundColor: sleepSeries.colors.map(c => c || '#3a6ea5') }] },
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false }, title: { display: true, text: `睡眠時間${modeTitle}` } }, scales: { y: { beginAtZero: true } } },
+  });
+
+  stepsChart = new Chart(document.getElementById('stepsChart'), {
+    type: 'bar',
+    data: { labels: stepsSeries.labels, datasets: [{ label: '歩数', data: stepsSeries.values, backgroundColor: stepsSeries.colors.map(c => c || '#4a9e6f') }] },
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false }, title: { display: true, text: `歩数${modeTitle}` } }, scales: { y: { beginAtZero: true } } },
+  });
+}
+
+async function loadVitals() {
+  const { start, end } = vitalsRangeForMode(state.vitalsMode);
+  try {
+    state.vitals = await apiGet(`/api/vitals?start=${start}&end=${end}`);
+  } catch (e) {
+    state.vitals = { sleep: [], steps: [] };
+  }
+  renderCharts();
+}
+
+document.querySelectorAll('.period-toggle [data-mode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.vitalsMode = btn.dataset.mode;
+    document.querySelectorAll('.period-toggle [data-mode]').forEach(b => b.classList.toggle('active', b === btn));
+    loadVitals();
+  });
+});
+
+document.querySelector('.period-toggle [data-mode="31d"]').classList.add('active');
+loadEntries();
+loadVitals();
+</script>
+</body>
+</html>

@@ -43,6 +43,11 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/view")
+def doctor_view():
+    return render_template("view.html")
+
+
 @app.route("/sw.js")
 def service_worker():
     # served from the root path (not /static/sw.js) so its default scope covers the whole app
@@ -76,25 +81,14 @@ def parse_bool(value, default=False):
 @app.route("/api/memo", methods=["GET"])
 def list_memos():
     qdate = request.args.get("date")
-    year = request.args.get("year")
-    month = request.args.get("month")
+    limit = min(int(request.args.get("limit", 200)), 500)
 
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             if qdate:
                 cur.execute("SELECT * FROM memos WHERE date = %s", (qdate,))
-            elif year and month:
-                cur.execute(
-                    """
-                    SELECT * FROM memos
-                    WHERE extract(year FROM date) = %s
-                      AND extract(month FROM date) = %s
-                    ORDER BY date
-                    """,
-                    (int(year), int(month)),
-                )
             else:
-                cur.execute("SELECT * FROM memos ORDER BY date DESC LIMIT 90")
+                cur.execute("SELECT * FROM memos ORDER BY date DESC LIMIT %s", (limit,))
             rows = cur.fetchall()
 
     return jsonify([row_to_memo(r) for r in rows])
@@ -202,18 +196,11 @@ def delete_memo(memo_id):
 
 @app.route("/api/vitals", methods=["GET"])
 def get_vitals():
-    qdate = request.args.get("date")
-    year = request.args.get("year")
-    month = request.args.get("month")
+    end = request.args.get("end") or date.today().isoformat()
+    start = request.args.get("start") or (date.fromisoformat(end) - timedelta(days=30)).isoformat()
 
-    where = ""
-    params = ()
-    if qdate:
-        where = "WHERE date = %s"
-        params = (qdate,)
-    elif year and month:
-        where = "WHERE extract(year FROM date) = %s AND extract(month FROM date) = %s"
-        params = (int(year), int(month))
+    where = "WHERE date BETWEEN %s AND %s"
+    params = (start, end)
 
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -228,16 +215,17 @@ def get_vitals():
     })
 
 
-DATE_KEYS = ("date", "day", "日付")
-DURATION_KEYS = ("duration", "minutes", "sleep", "sleep_minutes", "分", "睡眠時間")
-STEPS_KEYS = ("steps", "step", "steps_count", "歩数")
+DATE_KEYS = ("date", "day", "timestamp", "日付")
+DURATION_KEYS = ("duration", "minutes", "sleep", "分", "睡眠時間")
+STEPS_KEYS = ("steps", "step", "歩数")
 
 
 def find_key(fieldnames, candidates):
-    lowered = {f.strip().lower(): f for f in fieldnames if f}
+    lowered = [(f, f.strip().lower()) for f in fieldnames if f]
     for cand in candidates:
-        if cand in lowered:
-            return lowered[cand]
+        for original, low in lowered:
+            if cand in low:
+                return original
     return None
 
 

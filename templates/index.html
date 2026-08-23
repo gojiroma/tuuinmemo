@@ -39,8 +39,20 @@
     padding: 12px 18px;
     background: var(--accent);
     color: #fff;
+    gap: 10px;
+    flex-wrap: wrap;
   }
   header h1 { font-size: 1.05rem; margin: 0; font-weight: 600; }
+  header .header-right { display: flex; align-items: center; gap: 10px; }
+  header a.view-link {
+    color: #fff;
+    font-size: 0.8rem;
+    text-decoration: none;
+    border: 1px solid rgba(255,255,255,0.5);
+    border-radius: 999px;
+    padding: 4px 12px;
+  }
+  header a.view-link:hover { background: rgba(255,255,255,0.15); }
   #statusBadge {
     font-size: 0.75rem;
     padding: 2px 10px;
@@ -50,9 +62,10 @@
   #statusBadge.offline { background: #c0392b; }
   .app {
     display: grid;
-    grid-template-columns: minmax(300px, 430px) 1fr;
+    grid-template-columns: minmax(280px, 360px) 1fr;
     gap: 14px;
     padding: 14px;
+    padding-bottom: 0;
     align-items: start;
   }
   @media (max-width: 860px) {
@@ -71,46 +84,37 @@
     color: var(--text-dim);
     font-weight: 600;
   }
-  .cal-nav {
+  .jump-row { display: flex; gap: 6px; margin-bottom: 10px; }
+  .jump-row input[type=date] { flex: 1; }
+  .entry-list {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 8px;
-  }
-  .cal-nav button {
-    background: none; border: none; font-size: 1.1rem; cursor: pointer; color: var(--accent);
-    padding: 4px 10px;
-  }
-  .cal-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    flex-direction: column;
     gap: 4px;
-    text-align: center;
+    max-height: 420px;
+    overflow-y: auto;
   }
-  .cal-grid .dow { font-size: 0.72rem; color: var(--text-dim); padding-bottom: 4px; }
-  .cal-day {
-    position: relative;
-    padding: 8px 0;
+  .entry-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
     border-radius: 8px;
     cursor: pointer;
-    font-size: 0.85rem;
     border: 1px solid transparent;
   }
-  .cal-day:hover { background: var(--accent-dim); }
-  .cal-day.empty { cursor: default; }
-  .cal-day.empty:hover { background: none; }
-  .cal-day.clinic { background: var(--clinic-bg); color: var(--clinic); font-weight: 600; }
-  .cal-day.has-memo::after {
-    content: "";
-    position: absolute;
-    bottom: 3px; left: 50%;
-    transform: translateX(-50%);
-    width: 4px; height: 4px;
-    border-radius: 50%;
-    background: var(--accent);
+  .entry-row:hover { background: var(--accent-dim); }
+  .entry-row.selected { border-color: var(--accent); background: var(--accent-dim); }
+  .entry-row .entry-top { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; }
+  .entry-row .entry-summary { font-size: 0.78rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .badge-clinic {
+    font-size: 0.68rem;
+    background: var(--clinic-bg);
+    color: var(--clinic);
+    border-radius: 999px;
+    padding: 1px 8px;
+    font-weight: 600;
   }
-  .cal-day.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
-  .cal-day.today { text-decoration: underline; }
+  .entry-empty { font-size: 0.82rem; color: var(--text-dim); padding: 8px 4px; }
   .field-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
   .field-row label { font-size: 0.85rem; color: var(--text-dim); }
   input[type=text], textarea, input[type=date] {
@@ -135,6 +139,7 @@
   }
   button.btn.secondary { background: #fff; color: var(--accent); border: 1px solid var(--accent); }
   button.btn.danger { background: #fff; color: var(--danger); border: 1px solid var(--danger); }
+  button.btn.active { background: var(--accent); color: #fff; }
   button.btn:disabled { opacity: 0.5; cursor: default; }
   .editor-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px; }
   .editor-toolbar .group { display: flex; gap: 6px; }
@@ -144,10 +149,16 @@
   #contentView :first-child { margin-top: 0; }
   .save-row { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
   #saveStatus { font-size: 0.78rem; color: var(--text-dim); }
-  .charts-row { display: flex; gap: 10px; }
-  .charts-row > div { flex: 1; min-width: 0; }
+
+  .vitals-section { padding: 14px; }
+  .vitals-card { max-width: none; }
+  .vitals-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+  .period-toggle { display: flex; gap: 6px; }
+  .charts-row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .charts-row > div { flex: 1 1 420px; min-width: 0; }
+  .chart-box { height: 380px; position: relative; }
   #chartsContainer { background: #fff; padding: 8px; border-radius: 8px; }
-  .import-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .import-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
   .import-row label.btn { display: inline-block; }
   .import-row input[type=file] { display: none; }
   .hint { font-size: 0.75rem; color: var(--text-dim); margin-top: 6px; }
@@ -157,21 +168,23 @@
 <body>
 <header>
   <h1>📋 通院メモ</h1>
-  <span id="statusBadge">オンライン</span>
+  <div class="header-right">
+    <a class="view-link" href="/view" target="_blank" rel="noopener">🩺 医師用ページを開く</a>
+    <span id="statusBadge">オンライン</span>
+  </div>
 </header>
 
 <div class="app">
   <div class="left">
     <div class="card">
-      <div class="cal-nav">
-        <button id="prevMonth">‹</button>
-        <h2 id="monthLabel" style="margin:0;">-</h2>
-        <button id="nextMonth">›</button>
+      <h2>エントリ一覧</h2>
+      <div class="jump-row">
+        <input type="date" id="jumpDateInput">
+        <button class="btn" id="jumpBtn">開く/新規</button>
       </div>
-      <div class="cal-grid" id="calGrid"></div>
-      <div class="hint">🟠 通院日 ・ 点＝メモあり</div>
+      <div class="entry-list" id="entryList"></div>
 
-      <div class="selected-date-label" id="selectedDateLabel"></div>
+      <div class="selected-date-label" id="selectedDateLabel" style="margin-top:14px;"></div>
       <div class="field-row">
         <input type="checkbox" id="clinicDayCheck">
         <label for="clinicDayCheck">この日は通院日</label>
@@ -180,22 +193,6 @@
         <label for="summaryInput" style="margin-bottom:4px;">サマリ（短い要約）</label>
         <input type="text" id="summaryInput" placeholder="今日のひとこと要約">
       </div>
-    </div>
-
-    <div class="card">
-      <h2>バイタル（睡眠・歩数）</h2>
-      <div id="chartsContainer">
-        <div class="charts-row">
-          <div><canvas id="sleepChart" height="160"></canvas></div>
-          <div><canvas id="stepsChart" height="160"></canvas></div>
-        </div>
-      </div>
-      <div class="import-row">
-        <button class="btn secondary" id="saveChartImageBtn">🖼 グラフを画像保存</button>
-        <label class="btn secondary">睡眠CSVインポート<input type="file" id="sleepCsvInput" accept=".csv"></label>
-        <label class="btn secondary">歩数CSVインポート<input type="file" id="stepsCsvInput" accept=".csv"></label>
-      </div>
-      <div class="hint">CSVは date/day 列 と duration(分)/steps 列を自動検出します。</div>
     </div>
   </div>
 
@@ -219,6 +216,31 @@
   </div>
 </div>
 
+<div class="vitals-section">
+  <div class="card vitals-card">
+    <div class="vitals-toolbar">
+      <h2 style="margin:0;">📊 バイタル（睡眠・歩数）</h2>
+      <div class="period-toggle">
+        <button class="btn secondary" data-mode="31d">直近31日</button>
+        <button class="btn secondary" data-mode="week">週次</button>
+        <button class="btn secondary" data-mode="month">月次</button>
+      </div>
+    </div>
+    <div id="chartsContainer">
+      <div class="charts-row">
+        <div class="chart-box"><canvas id="sleepChart"></canvas></div>
+        <div class="chart-box"><canvas id="stepsChart"></canvas></div>
+      </div>
+    </div>
+    <div class="import-row">
+      <button class="btn secondary" id="saveChartImageBtn">🖼 グラフを画像保存</button>
+      <label class="btn secondary">睡眠CSVインポート<input type="file" id="sleepCsvInput" accept=".csv"></label>
+      <label class="btn secondary">歩数CSVインポート<input type="file" id="stepsCsvInput" accept=".csv"></label>
+    </div>
+    <div class="hint">CSVは date/day/timestamp 列 と duration(分)/sleep/steps 列を自動検出します。</div>
+  </div>
+</div>
+
 <footer>通院メモ &middot; データは Neon PostgreSQL に保存されます</footer>
 
 <script>
@@ -232,11 +254,11 @@ const TEMPLATE = `## 生活変化
 `;
 
 const state = {
-  year: new Date().getFullYear(),
-  month: new Date().getMonth() + 1, // 1-12
   selectedDate: fmtDate(new Date()),
-  memosByDate: {},
+  entries: [],
+  entriesByDate: {},
   vitals: { sleep: [], steps: [] },
+  vitalsMode: '31d',
   editMode: true,
   currentMemoId: null,
 };
@@ -250,21 +272,15 @@ function fmtDate(d) {
   return `${y}-${m}-${day}`;
 }
 
-function daysInMonth(year, month) {
-  return new Date(year, month, 0).getDate();
-}
-
-function firstWeekday(year, month) {
-  return new Date(year, month - 1, 1).getDay();
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return fmtDate(d);
 }
 
 // ---------------------------------------------------------------------
 // Networking + offline cache
 // ---------------------------------------------------------------------
-
-function cacheKey(type) {
-  return `cache:${type}:${state.year}-${state.month}`;
-}
 
 async function apiGet(url) {
   const res = await fetch(url);
@@ -272,28 +288,23 @@ async function apiGet(url) {
   return res.json();
 }
 
-async function loadMonthData() {
-  const memoUrl = `/api/memo?year=${state.year}&month=${state.month}`;
-  const vitalsUrl = `/api/vitals?year=${state.year}&month=${state.month}`;
+async function loadEntries() {
   try {
-    const [memos, vitals] = await Promise.all([apiGet(memoUrl), apiGet(vitalsUrl)]);
-    state.memosByDate = {};
-    memos.forEach(m => { state.memosByDate[m.date] = m; });
-    state.vitals = vitals;
-    localStorage.setItem(cacheKey('memos'), JSON.stringify(memos));
-    localStorage.setItem(cacheKey('vitals'), JSON.stringify(vitals));
+    const entries = await apiGet('/api/memo?limit=200');
+    state.entries = entries;
+    state.entriesByDate = {};
+    entries.forEach(m => { state.entriesByDate[m.date] = m; });
+    localStorage.setItem('cache:entries', JSON.stringify(entries));
     setStatus('オンライン', false);
   } catch (e) {
     console.warn('offline, using cache', e);
-    const cachedMemos = JSON.parse(localStorage.getItem(cacheKey('memos')) || '[]');
-    const cachedVitals = JSON.parse(localStorage.getItem(cacheKey('vitals')) || '{"sleep":[],"steps":[]}');
-    state.memosByDate = {};
-    cachedMemos.forEach(m => { state.memosByDate[m.date] = m; });
-    state.vitals = cachedVitals;
+    const cached = JSON.parse(localStorage.getItem('cache:entries') || '[]');
+    state.entries = cached;
+    state.entriesByDate = {};
+    cached.forEach(m => { state.entriesByDate[m.date] = m; });
     setStatus('オフライン（キャッシュ表示）', true);
   }
-  renderCalendar();
-  renderCharts();
+  renderEntryList();
 }
 
 function setStatus(text, offline) {
@@ -340,74 +351,58 @@ async function syncPendingDrafts() {
       break; // still offline, stop trying
     }
   }
-  if (dateInCurrentMonth(state.selectedDate)) loadMonthData();
-}
-
-function dateInCurrentMonth(dateStr) {
-  const [y, m] = dateStr.split('-').map(Number);
-  return y === state.year && m === state.month;
+  loadEntries();
 }
 
 window.addEventListener('online', () => { setStatus('オンライン', false); syncPendingDrafts(); });
 window.addEventListener('offline', () => setStatus('オフライン', true));
 
 // ---------------------------------------------------------------------
-// Calendar
+// Entry list
 // ---------------------------------------------------------------------
 
-function renderCalendar() {
-  document.getElementById('monthLabel').textContent = `${state.year}年 ${state.month}月`;
-  const grid = document.getElementById('calGrid');
-  grid.innerHTML = '';
+function renderEntryList() {
+  const list = document.getElementById('entryList');
+  list.innerHTML = '';
 
-  ['日', '月', '火', '水', '木', '金', '土'].forEach(d => {
-    const el = document.createElement('div');
-    el.className = 'dow';
-    el.textContent = d;
-    grid.appendChild(el);
+  if (!state.entries.length) {
+    list.innerHTML = '<div class="entry-empty">まだエントリがありません。日付を選んで作成してください。</div>';
+    return;
+  }
+
+  state.entries.forEach(m => {
+    const row = document.createElement('div');
+    row.className = 'entry-row';
+    if (m.date === state.selectedDate) row.classList.add('selected');
+
+    const top = document.createElement('div');
+    top.className = 'entry-top';
+    top.innerHTML = `<span>${m.date}</span>` + (m.is_clinic_day ? '<span class="badge-clinic">通院日</span>' : '');
+    row.appendChild(top);
+
+    if (m.summary) {
+      const summary = document.createElement('div');
+      summary.className = 'entry-summary';
+      summary.textContent = m.summary;
+      row.appendChild(summary);
+    }
+
+    row.addEventListener('click', () => selectDate(m.date));
+    list.appendChild(row);
   });
-
-  const blanks = firstWeekday(state.year, state.month);
-  for (let i = 0; i < blanks; i++) {
-    const el = document.createElement('div');
-    el.className = 'cal-day empty';
-    grid.appendChild(el);
-  }
-
-  const total = daysInMonth(state.year, state.month);
-  const todayStr = fmtDate(new Date());
-  for (let day = 1; day <= total; day++) {
-    const dateStr = `${state.year}-${String(state.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const memo = state.memosByDate[dateStr];
-    const el = document.createElement('div');
-    el.className = 'cal-day';
-    if (memo && memo.is_clinic_day) el.classList.add('clinic');
-    if (memo && (memo.summary || memo.content)) el.classList.add('has-memo');
-    if (dateStr === state.selectedDate) el.classList.add('selected');
-    if (dateStr === todayStr) el.classList.add('today');
-    el.textContent = day;
-    el.addEventListener('click', () => selectDate(dateStr));
-    grid.appendChild(el);
-  }
 }
 
 function selectDate(dateStr) {
   state.selectedDate = dateStr;
-  const [y, m] = dateStr.split('-').map(Number);
-  if (y !== state.year || m !== state.month) {
-    state.year = y;
-    state.month = m;
-    loadMonthData().then(() => loadEditorForSelectedDate());
-    return;
-  }
-  renderCalendar();
+  document.getElementById('jumpDateInput').value = dateStr;
+  renderEntryList();
   loadEditorForSelectedDate();
 }
 
 function loadEditorForSelectedDate() {
   const dateStr = state.selectedDate;
   document.getElementById('selectedDateLabel').textContent = dateStr;
-  const memo = state.memosByDate[dateStr];
+  const memo = state.entriesByDate[dateStr];
   const draft = getDraft(dateStr);
 
   const base = draft || memo || { is_clinic_day: false, summary: '', content: '' };
@@ -420,6 +415,11 @@ function loadEditorForSelectedDate() {
   setSaveStatus(draft ? '未保存の下書きがあります' : '');
   updatePreview();
 }
+
+document.getElementById('jumpBtn').addEventListener('click', () => {
+  const v = document.getElementById('jumpDateInput').value;
+  if (v) selectDate(v);
+});
 
 // ---------------------------------------------------------------------
 // Editor
@@ -490,11 +490,18 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     });
     if (!res.ok) throw new Error(await res.text());
     const memo = await res.json();
-    state.memosByDate[dateStr] = memo;
+    state.entriesByDate[dateStr] = memo;
+    if (!state.entries.some(m => m.date === dateStr)) {
+      state.entries.unshift(memo);
+      state.entries.sort((a, b) => b.date.localeCompare(a.date));
+    } else {
+      state.entries = state.entries.map(m => m.date === dateStr ? memo : m);
+    }
     state.currentMemoId = memo.id;
     clearDraft(dateStr);
     setSaveStatus('保存しました ✓');
-    renderCalendar();
+    renderEntryList();
+    renderCharts();
   } catch (e) {
     saveDraft(dateStr, currentFormData());
     setSaveStatus('オフラインのため下書き保存しました');
@@ -505,11 +512,12 @@ document.getElementById('deleteBtn').addEventListener('click', async () => {
   const dateStr = state.selectedDate;
   if (!confirm(`${dateStr} のメモを削除しますか？`)) return;
   clearDraft(dateStr);
-  const memo = state.memosByDate[dateStr];
+  const memo = state.entriesByDate[dateStr];
   if (memo) {
     try {
       await fetch(`/api/memo/${memo.id}`, { method: 'DELETE' });
-      delete state.memosByDate[dateStr];
+      delete state.entriesByDate[dateStr];
+      state.entries = state.entries.filter(m => m.date !== dateStr);
     } catch (e) {
       setSaveStatus('オフラインのため削除できませんでした');
       return;
@@ -519,7 +527,8 @@ document.getElementById('deleteBtn').addEventListener('click', async () => {
   document.getElementById('summaryInput').value = '';
   document.getElementById('contentEdit').value = '';
   setSaveStatus('削除しました');
-  renderCalendar();
+  renderEntryList();
+  renderCharts();
   updatePreview();
 });
 
@@ -527,59 +536,153 @@ document.getElementById('deleteBtn').addEventListener('click', async () => {
 // Charts
 // ---------------------------------------------------------------------
 
+function weekStart(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const offset = (d.getDay() + 6) % 7; // Monday = 0
+  d.setDate(d.getDate() - offset);
+  return fmtDate(d);
+}
+
+function monthStart(dateStr) {
+  return dateStr.slice(0, 7) + '-01';
+}
+
+function shortLabel(dateStr) {
+  const [, m, d] = dateStr.split('-');
+  return `${Number(m)}/${Number(d)}`;
+}
+
+function monthLabel(dateStr) {
+  const [y, m] = dateStr.split('-');
+  return `${y}/${Number(m)}`;
+}
+
+function vitalsRangeForMode(mode) {
+  const end = fmtDate(new Date());
+  if (mode === '31d') return { start: addDays(end, -30), end };
+  if (mode === 'week') return { start: addDays(end, -7 * 12 + 1), end };
+  return { start: addDays(end, -365), end }; // month: ~12 months back
+}
+
+function buildSeries(rawRows, dateField, valueField, mode, clinicDates, convertFn) {
+  if (mode === '31d') {
+    const byDate = {};
+    rawRows.forEach(r => { byDate[r[dateField]] = r[valueField]; });
+    const { start, end } = vitalsRangeForMode(mode);
+    const labels = [];
+    const values = [];
+    const colors = [];
+    let d = start;
+    while (d <= end) {
+      labels.push(shortLabel(d));
+      const raw = byDate[d];
+      values.push(raw !== undefined ? convertFn(raw) : 0);
+      colors.push(clinicDates.has(d) ? '#e0793a' : null);
+      d = addDays(d, 1);
+    }
+    return { labels, values, colors };
+  }
+
+  const groupFn = mode === 'week' ? weekStart : monthStart;
+  const labelFn = mode === 'week' ? shortLabel : monthLabel;
+  const buckets = {}; // key -> { sum, count, clinic }
+
+  rawRows.forEach(r => {
+    const key = groupFn(r[dateField]);
+    if (!buckets[key]) buckets[key] = { sum: 0, count: 0, clinic: false };
+    buckets[key].sum += r[valueField];
+    buckets[key].count += 1;
+  });
+  clinicDates.forEach(cd => {
+    const key = groupFn(cd);
+    if (buckets[key]) buckets[key].clinic = true;
+  });
+
+  const keys = Object.keys(buckets).sort();
+  return {
+    labels: keys.map(labelFn),
+    values: keys.map(k => convertFn(buckets[k].count ? buckets[k].sum / buckets[k].count : 0)),
+    colors: keys.map(k => buckets[k].clinic ? '#e0793a' : null),
+  };
+}
+
 function renderCharts() {
-  const total = daysInMonth(state.year, state.month);
-  const labels = Array.from({ length: total }, (_, i) => String(i + 1));
-
-  const sleepByDate = {};
-  state.vitals.sleep.forEach(r => { sleepByDate[r.date] = r.duration; });
-  const stepsByDate = {};
-  state.vitals.steps.forEach(r => { stepsByDate[r.date] = r.steps; });
-
-  const clinicDays = new Set(
-    Object.values(state.memosByDate).filter(m => m.is_clinic_day).map(m => m.date)
+  const { start, end } = vitalsRangeForMode(state.vitalsMode);
+  const clinicDates = new Set(
+    state.entries.filter(m => m.is_clinic_day && m.date >= start && m.date <= end).map(m => m.date)
   );
 
-  const sleepData = [];
-  const sleepColors = [];
-  const stepsData = [];
-  const stepsColors = [];
+  const sleepSeries = buildSeries(state.vitals.sleep, 'date', 'duration', state.vitalsMode, clinicDates, v => +(v / 60).toFixed(1));
+  const stepsSeries = buildSeries(state.vitals.steps, 'date', 'steps', state.vitalsMode, clinicDates, v => Math.round(v));
 
-  for (let day = 1; day <= total; day++) {
-    const dateStr = `${state.year}-${String(state.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const isClinic = clinicDays.has(dateStr);
-    sleepData.push(sleepByDate[dateStr] ? +(sleepByDate[dateStr] / 60).toFixed(1) : 0);
-    sleepColors.push(isClinic ? '#e0793a' : '#3a6ea5');
-    stepsData.push(stepsByDate[dateStr] || 0);
-    stepsColors.push(isClinic ? '#e0793a' : '#4a9e6f');
-  }
+  const defaultSleepColor = '#3a6ea5';
+  const defaultStepsColor = '#4a9e6f';
 
   if (sleepChart) sleepChart.destroy();
   if (stepsChart) stepsChart.destroy();
 
+  const modeTitle = state.vitalsMode === '31d' ? '' : state.vitalsMode === 'week' ? '（週平均）' : '（月平均）';
+
   sleepChart = new Chart(document.getElementById('sleepChart'), {
     type: 'bar',
-    data: { labels, datasets: [{ label: '睡眠(時間)', data: sleepData, backgroundColor: sleepColors }] },
+    data: {
+      labels: sleepSeries.labels,
+      datasets: [{
+        label: '睡眠(時間)',
+        data: sleepSeries.values,
+        backgroundColor: sleepSeries.colors.map(c => c || defaultSleepColor),
+      }],
+    },
     options: {
-      plugins: { legend: { display: false }, title: { display: true, text: '睡眠時間' } },
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, title: { display: true, text: `睡眠時間${modeTitle}` } },
       scales: { y: { beginAtZero: true } },
     },
   });
 
   stepsChart = new Chart(document.getElementById('stepsChart'), {
     type: 'bar',
-    data: { labels, datasets: [{ label: '歩数', data: stepsData, backgroundColor: stepsColors }] },
+    data: {
+      labels: stepsSeries.labels,
+      datasets: [{
+        label: '歩数',
+        data: stepsSeries.values,
+        backgroundColor: stepsSeries.colors.map(c => c || defaultStepsColor),
+      }],
+    },
     options: {
-      plugins: { legend: { display: false }, title: { display: true, text: '歩数' } },
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, title: { display: true, text: `歩数${modeTitle}` } },
       scales: { y: { beginAtZero: true } },
     },
   });
 }
 
+async function loadVitals() {
+  const { start, end } = vitalsRangeForMode(state.vitalsMode);
+  const cacheK = `cache:vitals:${state.vitalsMode}`;
+  try {
+    const vitals = await apiGet(`/api/vitals?start=${start}&end=${end}`);
+    state.vitals = vitals;
+    localStorage.setItem(cacheK, JSON.stringify(vitals));
+  } catch (e) {
+    state.vitals = JSON.parse(localStorage.getItem(cacheK) || '{"sleep":[],"steps":[]}');
+  }
+  renderCharts();
+}
+
+document.querySelectorAll('.period-toggle [data-mode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.vitalsMode = btn.dataset.mode;
+    document.querySelectorAll('.period-toggle [data-mode]').forEach(b => b.classList.toggle('active', b === btn));
+    loadVitals();
+  });
+});
+
 document.getElementById('saveChartImageBtn').addEventListener('click', () => {
   html2canvas(document.getElementById('chartsContainer')).then(canvas => {
     const link = document.createElement('a');
-    link.download = `vitals_${state.year}-${String(state.month).padStart(2, '0')}.png`;
+    link.download = `vitals_${state.vitalsMode}_${fmtDate(new Date())}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
   });
@@ -600,7 +703,7 @@ async function importCsv(inputEl, type) {
     const result = await res.json();
     if (!res.ok) throw new Error(result.error || 'import failed');
     alert(`${result.imported}件インポートしました（${result.skipped}件スキップ）`);
-    loadMonthData();
+    loadVitals();
   } catch (e) {
     alert('インポートに失敗しました: ' + e.message);
   }
@@ -611,37 +714,25 @@ document.getElementById('sleepCsvInput').addEventListener('change', e => importC
 document.getElementById('stepsCsvInput').addEventListener('change', e => importCsv(e.target, 'steps'));
 
 // ---------------------------------------------------------------------
-// Month navigation
-// ---------------------------------------------------------------------
-
-document.getElementById('prevMonth').addEventListener('click', () => {
-  state.month -= 1;
-  if (state.month < 1) { state.month = 12; state.year -= 1; }
-  loadMonthData();
-});
-
-document.getElementById('nextMonth').addEventListener('click', () => {
-  state.month += 1;
-  if (state.month > 12) { state.month = 1; state.year += 1; }
-  loadMonthData();
-});
-
-// ---------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
 }
 
+document.querySelector('.period-toggle [data-mode="31d"]').classList.add('active');
+document.getElementById('jumpDateInput').value = state.selectedDate;
 setEditMode(true);
 setStatus(navigator.onLine ? 'オンライン' : 'オフライン', !navigator.onLine);
-loadMonthData().then(() => {
+
+loadEntries().then(() => {
   loadEditorForSelectedDate();
   if (navigator.onLine) syncPendingDrafts();
 });
+loadVitals();
 </script>
 </body>
 </html>
