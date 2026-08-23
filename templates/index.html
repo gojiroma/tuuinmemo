@@ -103,8 +103,22 @@
 
   .editor-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; }
   .editor-toolbar .group { display: flex; gap: 6px; flex-wrap: wrap; }
+  .editor-split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+  @media (max-width: 860px) {
+    .editor-split { grid-template-columns: 1fr; }
+  }
   #contentEdit { width: 100%; min-height: 380px; resize: vertical; line-height: 1.55; }
-  #contentView { min-height: 380px; line-height: 1.65; }
+  #contentView {
+    min-height: 380px;
+    max-height: 620px;
+    overflow-y: auto;
+    line-height: 1.65;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    padding: 9px 11px;
+    background: var(--bg-elevated);
+    transition: background var(--t), border-color var(--t);
+  }
   #contentView h2 { font-size: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
   #contentView :first-child { margin-top: 0; }
   .status-row { display: flex; justify-content: flex-end; align-items: center; }
@@ -159,11 +173,12 @@
       <div class="group">
         <button class="btn secondary" id="templateBtn">4セクション挿入</button>
         <button class="btn secondary" id="combineImagesBtn">🖼 画像を結合保存</button>
-        <button class="btn secondary" id="toggleModeBtn">プレビュー</button>
       </div>
     </div>
-    <textarea id="contentEdit" placeholder="## 生活変化&#10;&#10;## 体調&#10;&#10;## 今後の意向&#10;&#10;## 質問・相談・依頼"></textarea>
-    <div id="contentView" style="display:none;"></div>
+    <div class="editor-split">
+      <textarea id="contentEdit" placeholder="## 生活変化&#10;&#10;## 体調&#10;&#10;## 今後の意向&#10;&#10;## 質問・相談・依頼"></textarea>
+      <div id="contentView"></div>
+    </div>
     <div class="status-row">
       <span id="saveStatus"></span>
     </div>
@@ -219,7 +234,6 @@ const state = {
   entriesByDate: {},
   vitals: { sleep: [], steps: [] },
   vitalsMode: 'recent',
-  editMode: true,
   currentMemoId: null,
 };
 
@@ -435,14 +449,6 @@ function updatePreview() {
     : '<p style="color:var(--text-faint);">（内容なし）</p>';
 }
 
-function setEditMode(edit) {
-  state.editMode = edit;
-  document.getElementById('contentEdit').style.display = edit ? 'block' : 'none';
-  document.getElementById('contentView').style.display = edit ? 'none' : 'block';
-  document.getElementById('toggleModeBtn').textContent = edit ? 'プレビュー' : '編集';
-  if (!edit) updatePreview();
-}
-
 function setSaveStatus(text, kind) {
   const el = document.getElementById('saveStatus');
   el.textContent = text;
@@ -508,13 +514,12 @@ async function autosaveNow() {
 
 document.getElementById('summaryInput').addEventListener('input', onFormInput);
 document.getElementById('contentEdit').addEventListener('input', onFormInput);
+document.getElementById('contentEdit').addEventListener('input', updatePreview);
 document.getElementById('contentEdit').addEventListener('keydown', function (e) {
   applyMarkdownEditorKeydown(this, e);
 });
 document.getElementById('contentEdit').addEventListener('focus', () => document.body.classList.add('editor-focused'));
 document.getElementById('contentEdit').addEventListener('blur', () => document.body.classList.remove('editor-focused'));
-
-document.getElementById('toggleModeBtn').addEventListener('click', () => setEditMode(!state.editMode));
 
 document.getElementById('templateBtn').addEventListener('click', () => {
   const el = document.getElementById('contentEdit');
@@ -524,6 +529,7 @@ document.getElementById('templateBtn').addEventListener('click', () => {
     el.value += (el.value.endsWith('\n') ? '' : '\n') + '\n' + TEMPLATE;
   }
   onFormInput();
+  updatePreview();
 });
 
 async function deleteEntry(dateStr) {
@@ -701,7 +707,6 @@ if ('serviceWorker' in navigator) {
 
 document.querySelector('.period-toggle [data-mode="recent"]').classList.add('active');
 document.getElementById('jumpDateInput').value = state.selectedDate;
-setEditMode(true);
 setStatus(navigator.onLine ? 'オンライン' : 'オフライン', !navigator.onLine);
 
 loadEntries().then(() => {
