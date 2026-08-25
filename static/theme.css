@@ -146,7 +146,7 @@ header .nav-link:hover { background: rgba(255, 255, 255, 0.16); }
 
 .period-toggle { display: flex; gap: 6px; }
 
-input[type=text], input[type=date], textarea {
+input[type=text], input[type=date], input[type=search], textarea {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -157,7 +157,7 @@ input[type=text], input[type=date], textarea {
   color: var(--text);
   transition: border-color var(--t-fast), background var(--t);
 }
-input[type=text]:focus, input[type=date]:focus, textarea:focus {
+input[type=text]:focus, input[type=date]:focus, input[type=search]:focus, textarea:focus {
   outline: none;
   border-color: var(--accent);
 }

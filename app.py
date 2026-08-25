@@ -2,7 +2,7 @@ import csv
 import io
 import os
 import re
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import psycopg2
 import psycopg2.extras
@@ -77,7 +77,7 @@ def row_to_memo(row):
 @app.route("/api/memo", methods=["GET"])
 def list_memos():
     qdate = request.args.get("date")
-    limit = min(int(request.args.get("limit", 200)), 500)
+    limit = min(int(request.args.get("limit", 200)), 5000)
 
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -88,6 +88,9 @@ def list_memos():
             rows = cur.fetchall()
 
     return jsonify([row_to_memo(r) for r in rows])
+
+
+HISTORY_MIN_INTERVAL_SECONDS = 600  # only checkpoint a version if this much time passed since the last save
 
 
 @app.route("/api/memo", methods=["POST"])
@@ -102,6 +105,23 @@ def upsert_memo():
 
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # Lock the existing row (if any) so a burst of near-simultaneous
+            # autosaves can't each see a stale "last checkpoint" time and all
+            # archive at once.
+            cur.execute("SELECT * FROM memos WHERE date = %s FOR UPDATE", (memo_date,))
+            existing = cur.fetchone()
+
+            if existing and existing["content"] != content:
+                age = (datetime.now(timezone.utc) - existing["updated_at"]).total_seconds()
+                if age > HISTORY_MIN_INTERVAL_SECONDS:
+                    cur.execute(
+                        """
+                        INSERT INTO memo_history (memo_id, date, summary, content, archived_at)
+                        VALUES (%s, %s, %s, %s, %s)
+                        """,
+                        (existing["id"], existing["date"], existing["summary"], existing["content"], existing["updated_at"]),
+                    )
+
             cur.execute(
                 """
                 INSERT INTO memos (date, summary, content)
@@ -118,6 +138,36 @@ def upsert_memo():
         conn.commit()
 
     return jsonify(row_to_memo(row)), 201
+
+
+@app.route("/api/memo/<memo_id>/history", methods=["GET"])
+def get_memo_history(memo_id):
+    limit = min(int(request.args.get("limit", 50)), 200)
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT id, memo_id, date, summary, content, archived_at
+                FROM memo_history
+                WHERE memo_id = %s
+                ORDER BY archived_at DESC
+                LIMIT %s
+                """,
+                (memo_id, limit),
+            )
+            rows = cur.fetchall()
+
+    return jsonify([
+        {
+            "id": str(r["id"]),
+            "memo_id": str(r["memo_id"]),
+            "date": r["date"].isoformat(),
+            "summary": r["summary"],
+            "content": r["content"],
+            "archived_at": r["archived_at"].isoformat(),
+        }
+        for r in rows
+    ])
 
 
 @app.route("/api/memo/<memo_id>", methods=["GET"])
@@ -179,6 +229,46 @@ def delete_memo(memo_id):
     if not deleted:
         return jsonify({"error": "not found"}), 404
     return jsonify({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# Search history (keyword search itself runs client-side over all loaded
+# entries; this just remembers past search terms for suggestions)
+# ---------------------------------------------------------------------------
+
+@app.route("/api/search-history", methods=["GET"])
+def list_search_history():
+    limit = min(int(request.args.get("limit", 20)), 100)
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT query FROM search_history ORDER BY searched_at DESC LIMIT %s",
+                (limit,),
+            )
+            rows = cur.fetchall()
+
+    return jsonify([r["query"] for r in rows])
+
+
+@app.route("/api/search-history", methods=["POST"])
+def save_search_history():
+    data = request.get_json(force=True, silent=True) or {}
+    query = (data.get("query") or "").strip()
+    if not query:
+        return jsonify({"error": "query is required"}), 400
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO search_history (query) VALUES (%s)
+                ON CONFLICT (query) DO UPDATE SET searched_at = now()
+                """,
+                (query,),
+            )
+        conn.commit()
+
+    return jsonify({"ok": True}), 201
 
 
 # ---------------------------------------------------------------------------

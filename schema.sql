@@ -34,3 +34,24 @@ CREATE TABLE IF NOT EXISTS steps_data (
 );
 
 CREATE INDEX IF NOT EXISTS idx_steps_data_date ON steps_data (date);
+
+-- メモ編集履歴（十分な間隔を空けた上書き時にだけ直前バージョンをスナップショット）
+CREATE TABLE IF NOT EXISTS memo_history (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    memo_id uuid NOT NULL REFERENCES memos(id) ON DELETE CASCADE,
+    date date NOT NULL,
+    summary text,
+    content text,
+    archived_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_memo_history_memo_id ON memo_history (memo_id, archived_at DESC);
+
+-- キーワード検索履歴（直近使った検索語をサジェスト用に保存）
+CREATE TABLE IF NOT EXISTS search_history (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    query text NOT NULL UNIQUE,
+    searched_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_search_history_searched_at ON search_history (searched_at DESC);

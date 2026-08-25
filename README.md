@@ -48,11 +48,14 @@ Vercel プロジェクトの環境変数に `DATABASE_URL` を設定してくだ
 | メソッド | パス | 内容 |
 |---|---|---|
 | GET | `/api/memo?date=YYYY-MM-DD` | 指定日のメモ取得 |
-| GET | `/api/memo?limit=200` | 直近N件のメモ一覧（エントリ一覧用、デフォルト200件・最大500件） |
-| POST | `/api/memo` | メモの作成/更新（日付でupsert） |
+| GET | `/api/memo?limit=200` | 直近N件のメモ一覧（エントリ一覧・キーワード検索用、デフォルト200件・最大5000件） |
+| POST | `/api/memo` | メモの作成/更新（日付でupsert。既存メモを10分以上ぶりに上書きする場合は直前の内容を`memo_history`へ保存） |
 | GET / PUT / DELETE | `/api/memo/<id>` | ID指定での取得・更新・削除 |
+| GET | `/api/memo/<id>/history` | 編集履歴の一覧（新しい順、デフォルト50件・最大200件） |
 | GET | `/api/vitals?start=YYYY-MM-DD&end=YYYY-MM-DD` | 睡眠・歩数データ取得（省略時は直近50日） |
 | POST | `/api/vitals/import-csv` | CSVインポート（`type=sleep`\|`steps`, `file`） |
+| GET | `/api/search-history?limit=20` | 直近使ったキーワード検索語（新しい順、デフォルト20件・最大100件） |
+| POST | `/api/search-history` | 検索語を履歴に保存（`{"query": "..."}`、同じ語なら日時だけ更新） |
 
 CSVは `date`/`day`/`timestamp` 列と `duration`/`sleep`(分)/`steps` 列を、大文字小文字を問わず部分一致で自動検出します（例: `Timestamp` + `Steps (steps)` / `Timestamp` + `Sleep duration`）。
 
@@ -67,3 +70,5 @@ CSVは `date`/`day`/`timestamp` 列と `duration`/`sleep`(分)/`steps` 列を、
 - 本文は入力停止後に自動保存されます（保存ボタンはありません）。オフライン時は `localStorage` に下書き保存し、オンライン復帰時に自動同期します。
 - エントリの削除はエントリ一覧の各行にある🗑ボタンから行います。
 - `/api/cleanup` のような自動削除機能は、実データ喪失リスクがあるため今回は未実装です。
+- エントリ一覧の検索欄はキーワードを含む本文のエントリだけに絞り込みます（サーバー側のロード済み全エントリに対するクライアント側フィルタ）。検索語は`search_history`テーブルに保存され、次回以降サジェスト（`<datalist>`）に表示されます。
+- 「🕘 編集履歴」ボタンから、そのエントリを10分以上の間隔を空けて上書き保存した過去バージョンを一覧できます。各バージョンの「この内容を復元」で編集欄に読み込み、以後は通常の自動保存フローで保存されます（頻繁なオートセーブ自体は履歴を増やしません）。

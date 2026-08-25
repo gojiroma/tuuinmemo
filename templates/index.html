@@ -28,6 +28,7 @@
   }
 
   /* Entry list -------------------------------------------------- */
+  .search-row { margin-bottom: 10px; }
   .jump-row { display: flex; gap: 6px; margin-bottom: 12px; }
   .jump-row input[type=date] { flex: 1; }
   .entry-list {
@@ -122,6 +123,7 @@
      in place instead of navigating to a separate page/URL. */
   body.view-mode .jump-row,
   body.view-mode .entry-delete,
+  body.view-mode #historyBtn,
   body.view-mode #templateBtn,
   body.view-mode #combineImagesBtn,
   body.view-mode #saveStatus,
@@ -144,6 +146,36 @@
   .import-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
   .import-row label.btn { display: inline-block; }
   .import-row input[type=file] { display: none; }
+
+  /* Edit history dialog -------------------------------------------- */
+  .history-dialog {
+    width: min(640px, 90vw);
+    max-height: 80vh;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    background: var(--card-bg);
+    color: var(--text);
+  }
+  .history-dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
+  .history-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .history-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 60vh; }
+  .history-item {
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+  }
+  .history-item-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+  .history-item-time { font-size: 0.78rem; color: var(--text-dim); }
+  .history-item-preview {
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 6px;
+  }
+  .history-empty { font-size: 0.82rem; color: var(--text-dim); padding: 8px 4px; }
 </style>
 </head>
 <body>
@@ -159,6 +191,10 @@
   <div class="left fade-on-editor-focus">
     <div class="card">
       <h2>エントリ一覧</h2>
+      <div class="search-row">
+        <input type="search" id="searchInput" list="searchHistoryList" placeholder="🔍 キーワード検索">
+        <datalist id="searchHistoryList"></datalist>
+      </div>
       <div class="jump-row">
         <input type="date" id="jumpDateInput">
         <button class="btn" id="jumpBtn">開く/新規</button>
@@ -176,6 +212,7 @@
     <div class="editor-toolbar">
       <h2 style="margin:0;">📝 Markdown メモ</h2>
       <div class="group">
+        <button class="btn secondary" id="historyBtn">🕘 編集履歴</button>
         <button class="btn secondary" id="templateBtn">4セクション挿入</button>
         <button class="btn secondary" id="combineImagesBtn">🖼 画像を結合保存</button>
       </div>
@@ -190,6 +227,14 @@
     </div>
   </div>
 </div>
+
+<dialog id="historyDialog" class="history-dialog">
+  <div class="history-head">
+    <h2 style="margin:0;">🕘 編集履歴</h2>
+    <button type="button" class="btn secondary" id="historyCloseBtn">閉じる</button>
+  </div>
+  <div id="historyList" class="history-list"></div>
+</dialog>
 
 <div class="vitals-section">
   <div class="card vitals-card">
@@ -244,6 +289,7 @@ const state = {
   vitals: { sleep: [], steps: [] },
   vitalsMode: 'recent',
   currentMemoId: null,
+  searchQuery: '',
 };
 
 let vitalsChart;
@@ -274,7 +320,7 @@ async function apiGet(url) {
 
 async function loadEntries() {
   try {
-    const entries = await apiGet('/api/memo?limit=200');
+    const entries = await apiGet('/api/memo?limit=3000');
     state.entries = entries;
     state.entriesByDate = {};
     entries.forEach(m => { state.entriesByDate[m.date] = m; });
@@ -347,6 +393,12 @@ window.addEventListener('offline', () => setStatus('オフライン', true));
 // Entry list
 // ---------------------------------------------------------------------
 
+function filteredEntries() {
+  const q = state.searchQuery.trim().toLowerCase();
+  if (!q) return state.entries;
+  return state.entries.filter(m => (m.content || '').toLowerCase().includes(q));
+}
+
 function renderEntryList() {
   const list = document.getElementById('entryList');
   list.innerHTML = '';
@@ -356,9 +408,15 @@ function renderEntryList() {
     return;
   }
 
+  const visible = filteredEntries();
+  if (!visible.length) {
+    list.innerHTML = '<div class="entry-empty">一致するエントリがありません。</div>';
+    return;
+  }
+
   const today = fmtDate(new Date());
 
-  state.entries.forEach(m => {
+  visible.forEach(m => {
     const row = document.createElement('div');
     row.className = 'entry-row';
     if (m.date === state.selectedDate) row.classList.add('selected');
@@ -456,6 +514,44 @@ function loadEditorForSelectedDate() {
 document.getElementById('jumpBtn').addEventListener('click', () => {
   const v = document.getElementById('jumpDateInput').value;
   if (v) selectDate(v);
+});
+
+// ---------------------------------------------------------------------
+// Keyword search (client-side over all loaded entries) + server-side
+// search-term history, offered back as suggestions via a <datalist>.
+// ---------------------------------------------------------------------
+
+async function loadSearchHistory() {
+  try {
+    const queries = await apiGet('/api/search-history?limit=20');
+    const list = document.getElementById('searchHistoryList');
+    list.innerHTML = '';
+    queries.forEach(q => {
+      const opt = document.createElement('option');
+      opt.value = q;
+      list.appendChild(opt);
+    });
+  } catch (e) {
+    // suggestions are a nicety; offline/error just means an empty list
+  }
+}
+
+function saveSearchHistory(query) {
+  fetch('/api/search-history', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query }),
+  }).then(loadSearchHistory).catch(() => {});
+}
+
+const searchInput = document.getElementById('searchInput');
+searchInput.addEventListener('input', () => {
+  state.searchQuery = searchInput.value;
+  renderEntryList();
+});
+searchInput.addEventListener('change', () => {
+  const q = searchInput.value.trim();
+  if (q) saveSearchHistory(q);
 });
 
 // ---------------------------------------------------------------------
@@ -577,6 +673,82 @@ async function deleteEntry(dateStr) {
   renderEntryList();
   renderCharts();
 }
+
+// ---------------------------------------------------------------------
+// Edit history (server-side checkpoints, see app.py's upsert_memo)
+// ---------------------------------------------------------------------
+
+function formatHistoryTime(iso) {
+  const d = new Date(iso);
+  const dateStr = fmtDate(d);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${dateStr} ${hh}:${mm}`;
+}
+
+async function openHistoryDialog() {
+  const listEl = document.getElementById('historyList');
+  const dialog = document.getElementById('historyDialog');
+  listEl.innerHTML = '<div class="history-empty">読み込み中…</div>';
+  dialog.showModal();
+
+  if (!state.currentMemoId) {
+    listEl.innerHTML = '<div class="history-empty">このエントリはまだ保存されていません。</div>';
+    return;
+  }
+
+  let versions;
+  try {
+    versions = await apiGet(`/api/memo/${state.currentMemoId}/history`);
+  } catch (e) {
+    listEl.innerHTML = '<div class="history-empty">履歴の取得に失敗しました。</div>';
+    return;
+  }
+
+  if (!versions.length) {
+    listEl.innerHTML = '<div class="history-empty">まだ履歴はありません（十分な間隔を空けて上書きすると記録されます）。</div>';
+    return;
+  }
+
+  listEl.innerHTML = '';
+  versions.forEach(v => {
+    const item = document.createElement('div');
+    item.className = 'history-item';
+
+    const head = document.createElement('div');
+    head.className = 'history-item-head';
+    const time = document.createElement('span');
+    time.className = 'history-item-time';
+    time.textContent = formatHistoryTime(v.archived_at);
+    head.appendChild(time);
+    const restoreBtn = document.createElement('button');
+    restoreBtn.className = 'btn secondary';
+    restoreBtn.type = 'button';
+    restoreBtn.textContent = 'この内容を復元';
+    restoreBtn.addEventListener('click', () => {
+      if (!confirm('現在の内容をこの履歴で置き換えますか？（置き換え後に保存されます）')) return;
+      const el = document.getElementById('contentEdit');
+      el.value = v.content || '';
+      onFormInput();
+      updatePreview();
+      dialog.close();
+    });
+    head.appendChild(restoreBtn);
+    item.appendChild(head);
+
+    const preview = document.createElement('div');
+    preview.className = 'history-item-preview';
+    preview.textContent = firstLine(v.content) || '（内容なし）';
+    item.appendChild(preview);
+
+    listEl.appendChild(item);
+  });
+}
+
+document.getElementById('historyBtn').addEventListener('click', openHistoryDialog);
+document.getElementById('historyCloseBtn').addEventListener('click', () => {
+  document.getElementById('historyDialog').close();
+});
 
 // ---------------------------------------------------------------------
 // Combine markdown-embedded images into one vertical PNG
@@ -756,6 +928,7 @@ loadEntries().then(() => {
   if (navigator.onLine) syncPendingDrafts();
 });
 loadVitals();
+loadSearchHistory();
 </script>
 </body>
 </html>
