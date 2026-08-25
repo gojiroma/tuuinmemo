@@ -1,5 +1,13 @@
 /* Shared design tokens + base chrome for 通院メモ (edit + view pages). */
 
+@font-face {
+  font-family: "Gojiro Manus";
+  src: url("/static/fonts/gojiromanus.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --bg: #faf6f0;
   --bg-elevated: #fffdfa;
@@ -57,7 +65,7 @@ html, body {
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+  font-family: "Gojiro Manus", -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
 }

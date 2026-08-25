@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tuuinmemo-shell-v3';
+const CACHE_NAME = 'tuuinmemo-shell-v4';
 const SHELL_FILES = [
   '/',
   '/static/manifest.json',
@@ -9,6 +9,7 @@ const SHELL_FILES = [
   '/static/idle-ui.js',
   '/static/vitals-chart.js',
   '/static/markdown-editor.js',
+  '/static/fonts/gojiromanus.otf',
 ];
 
 self.addEventListener('install', event => {
