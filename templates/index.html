@@ -139,7 +139,7 @@
   .vitals-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
   .chart-box { height: 440px; position: relative; }
   #chartsContainer { background: var(--bg-elevated); padding: 8px; border-radius: var(--radius-sm); transition: background var(--t); }
-  .external-link-row { margin-top: 12px; }
+  .external-link-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
   .external-link-row a.btn { text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
   .import-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
   .import-row label.btn { display: inline-block; }
@@ -198,6 +198,8 @@
       <div class="period-toggle ui-fade">
         <button class="btn secondary" data-mode="recent">直近50日</button>
         <button class="btn secondary" data-mode="recent100">直近100日</button>
+        <button class="btn secondary" data-mode="recent200">直近200日</button>
+        <button class="btn secondary" data-mode="recent300">直近300日</button>
         <button class="btn secondary" data-mode="week">週次</button>
         <button class="btn secondary" data-mode="month">月次</button>
       </div>
@@ -207,6 +209,7 @@
     </div>
     <div class="external-link-row">
       <a class="btn secondary" href="https://dashboard.exercise.quest/history" target="_blank" rel="noopener">📈 Exercise Dashboard の履歴を開く</a>
+      <a class="btn secondary" href="https://hanazonomental.com/" target="_blank" rel="noopener">🏥 病院のホームページ</a>
     </div>
     <div class="import-row">
       <button class="btn secondary" id="saveChartImageBtn">🖼 グラフを画像保存</button>
