@@ -21,8 +21,13 @@ CREATE INDEX IF NOT EXISTS idx_memos_clinic_day ON memos (is_clinic_day) WHERE i
 CREATE TABLE IF NOT EXISTS sleep_data (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     date date NOT NULL UNIQUE,
-    duration integer NOT NULL   -- 分単位
+    duration integer,   -- 分単位（レガシー。新規インポートは score を使用）
+    score integer        -- 睡眠スコア（0-100、CSVの overall_score 列）
 );
+
+-- 既存DBへの追従（CREATE TABLE IF NOT EXISTS は既存テーブルには効かないため）
+ALTER TABLE sleep_data ADD COLUMN IF NOT EXISTS score integer;
+ALTER TABLE sleep_data ALTER COLUMN duration DROP NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_sleep_data_date ON sleep_data (date);
 

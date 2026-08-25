@@ -96,6 +96,7 @@
     keys.forEach(k => { buckets[k] = { sum: 0, count: 0, clinic: false }; });
 
     rawRows.forEach(r => {
+      if (r[valueField] == null) return; // e.g. legacy sleep rows with no score
       const key = groupFn(r[dateField]);
       if (buckets[key]) {
         buckets[key].sum += r[valueField];
@@ -125,7 +126,7 @@
       entries.filter(m => m.date >= start && m.date <= end).map(m => m.date)
     );
 
-    const sleepSeries = aggregateToKeys(vitals.sleep, 'date', 'duration', mode, keys, clinicDates, v => +(v / 60).toFixed(1));
+    const sleepSeries = aggregateToKeys(vitals.sleep, 'date', 'score', mode, keys, clinicDates, v => +v.toFixed(1));
     const stepsSeries = aggregateToKeys(vitals.steps, 'date', 'steps', mode, keys, clinicDates, v => Math.round(v));
 
     if (existingChart) existingChart.destroy();
@@ -153,7 +154,7 @@
           },
           {
             type: 'line',
-            label: '睡眠(時間)',
+            label: '睡眠スコア',
             data: sleepSeries.values,
             borderColor: '#a8763f',
             backgroundColor: '#a8763f',
@@ -209,7 +210,7 @@
         },
         scales: {
           ySteps: { type: 'linear', position: 'left', beginAtZero: true, title: { display: true, text: '歩数' } },
-          ySleep: { type: 'linear', position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, title: { display: true, text: '睡眠(時間)' } },
+          ySleep: { type: 'linear', position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, title: { display: true, text: '睡眠スコア' } },
         },
       },
     });

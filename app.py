@@ -295,18 +295,22 @@ def get_vitals():
 
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(f"SELECT date, duration FROM sleep_data {where} ORDER BY date", params)
+            cur.execute(f"SELECT date, duration, score FROM sleep_data {where} ORDER BY date", params)
             sleep_rows = cur.fetchall()
             cur.execute(f"SELECT date, steps FROM steps_data {where} ORDER BY date", params)
             steps_rows = cur.fetchall()
 
     return jsonify({
-        "sleep": [{"date": r["date"].isoformat(), "duration": r["duration"]} for r in sleep_rows],
+        "sleep": [
+            {"date": r["date"].isoformat(), "duration": r["duration"], "score": r["score"]}
+            for r in sleep_rows
+        ],
         "steps": [{"date": r["date"].isoformat(), "steps": r["steps"]} for r in steps_rows],
     })
 
 
 DATE_KEYS = ("date", "day", "timestamp", "日付")
+SCORE_KEYS = ("overall_score", "sleep_score", "score", "スコア")
 DURATION_KEYS = ("duration", "minutes", "sleep", "分", "睡眠時間")
 STEPS_KEYS = ("steps", "step", "歩数")
 
@@ -322,6 +326,8 @@ def find_key(fieldnames, candidates):
 
 def parse_date_cell(value):
     value = value.strip()
+    if "T" in value:  # ISO timestamp (e.g. 2026-08-26T06:34:30Z) -> date part only
+        value = value.split("T", 1)[0]
     for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y", "%Y%m%d"):
         try:
             return datetime.strptime(value, fmt).date().isoformat()
@@ -346,7 +352,16 @@ def import_vitals_csv():
         return jsonify({"error": "empty CSV"}), 400
 
     date_key = find_key(reader.fieldnames, DATE_KEYS)
-    value_key = find_key(reader.fieldnames, DURATION_KEYS if data_type == "sleep" else STEPS_KEYS)
+
+    if data_type == "sleep":
+        col = "score"
+        value_key = find_key(reader.fieldnames, SCORE_KEYS)
+        if not value_key:  # fall back to old duration-based CSV exports
+            col = "duration"
+            value_key = find_key(reader.fieldnames, DURATION_KEYS)
+    else:
+        col = "steps"
+        value_key = find_key(reader.fieldnames, STEPS_KEYS)
 
     if not date_key or not value_key:
         return jsonify({
@@ -368,7 +383,6 @@ def import_vitals_csv():
         return jsonify({"error": "no valid rows", "details": errors}), 400
 
     table = "sleep_data" if data_type == "sleep" else "steps_data"
-    col = "duration" if data_type == "sleep" else "steps"
 
     with get_conn() as conn:
         with conn.cursor() as cur:
