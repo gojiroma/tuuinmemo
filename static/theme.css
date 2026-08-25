@@ -71,19 +71,20 @@ header {
   align-items: center;
   justify-content: space-between;
   padding: 13px 20px;
-  background: var(--accent);
-  color: #fff;
+  background: var(--bg-elevated);
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
   gap: 10px;
   flex-wrap: wrap;
-  transition: background var(--t);
+  transition: background var(--t), border-color var(--t);
 }
-header h1 { font-size: 1.02rem; margin: 0; font-weight: 600; letter-spacing: 0.01em; }
+header h1 { font-size: 1.02rem; margin: 0; font-weight: 600; letter-spacing: 0.01em; color: var(--accent); }
 header .header-right { display: flex; align-items: center; gap: 10px; }
 header .nav-link {
-  color: #fff;
+  color: var(--accent);
   font-size: 0.8rem;
   text-decoration: none;
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--accent-soft);
   border-radius: 999px;
   padding: 4px 12px;
   transition: background var(--t-fast), opacity var(--t);
@@ -92,15 +93,16 @@ header .nav-link {
   font-family: inherit;
   cursor: pointer;
 }
-header .nav-link:hover { background: rgba(255, 255, 255, 0.16); }
+header .nav-link:hover { background: var(--accent-dim); }
 #statusBadge {
   font-size: 0.72rem;
   padding: 3px 10px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.2);
-  transition: background var(--t-fast), opacity var(--t);
+  background: var(--accent-dim);
+  color: var(--accent);
+  transition: background var(--t-fast), color var(--t-fast), opacity var(--t);
 }
-#statusBadge.offline { background: var(--danger); }
+#statusBadge.offline { background: var(--danger-dim); color: var(--danger); }
 
 /* ---------------------------------------------------------------------
    Cards + buttons (shared vocabulary)
