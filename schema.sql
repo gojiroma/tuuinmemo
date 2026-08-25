@@ -48,10 +48,13 @@ CREATE TABLE IF NOT EXISTS memo_history (
 CREATE INDEX IF NOT EXISTS idx_memo_history_memo_id ON memo_history (memo_id, archived_at DESC);
 
 -- キーワード検索履歴（直近使った検索語をサジェスト用に保存）
-CREATE TABLE IF NOT EXISTS search_history (
+-- "memo_" 接頭辞は、同じDBに存在する無関係な search_history テーブルとの
+-- 名前衝突を避けるため（CREATE TABLE IF NOT EXISTS がそちらを既存テーブル
+-- とみなしてスキップしてしまう事故があったため）。
+CREATE TABLE IF NOT EXISTS memo_search_history (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     query text NOT NULL UNIQUE,
     searched_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_search_history_searched_at ON search_history (searched_at DESC);
+CREATE INDEX IF NOT EXISTS idx_memo_search_history_searched_at ON memo_search_history (searched_at DESC);

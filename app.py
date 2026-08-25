@@ -252,7 +252,7 @@ def list_search_history():
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
-                "SELECT query FROM search_history ORDER BY searched_at DESC LIMIT %s",
+                "SELECT query FROM memo_search_history ORDER BY searched_at DESC LIMIT %s",
                 (limit,),
             )
             rows = cur.fetchall()
@@ -271,7 +271,7 @@ def save_search_history():
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO search_history (query) VALUES (%s)
+                INSERT INTO memo_search_history (query) VALUES (%s)
                 ON CONFLICT (query) DO UPDATE SET searched_at = now()
                 """,
                 (query,),
