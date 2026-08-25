@@ -10,6 +10,10 @@
     const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     Chart.defaults.color = dark ? '#c7ab8e' : '#8a7862';
     Chart.defaults.borderColor = dark ? '#3e3024' : '#ecdfd0';
+    // Match the app-wide bump to bold + 1.2x size (Chart.js draws on canvas,
+    // so it doesn't pick up the CSS font-weight/font-size overrides).
+    Chart.defaults.font.weight = 'bold';
+    Chart.defaults.font.size = Math.round(12 * 1.2);
   }
   applyChartTheme();
   if (window.matchMedia) {

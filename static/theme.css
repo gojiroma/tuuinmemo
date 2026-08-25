@@ -59,6 +59,12 @@
 
 * { box-sizing: border-box; }
 
+/* Every font-size in this app is set in rem, so bumping the root size
+   scales the whole UI (headings, buttons, hints...) together. */
+html {
+  font-size: 120%;
+}
+
 html, body {
   background: var(--bg);
 }
@@ -68,6 +74,12 @@ body {
   font-family: "Gojiro Manus", -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+}
+
+/* The custom font reads thin at regular weight — force everything bold,
+   overriding the individual weight rules sprinkled through this file. */
+* {
+  font-weight: 700 !important;
 }
 
 ::selection { background: var(--accent-soft); }
