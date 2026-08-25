@@ -125,6 +125,7 @@ header .nav-link:hover { background: var(--accent-dim); }
   transition: background var(--t-fast), color var(--t-fast), opacity var(--t);
 }
 #statusBadge.offline { background: var(--danger-dim); color: var(--danger); }
+#statusBadge:empty { display: none; } /* online is the expected state — only show the badge when there's something to say */
 
 /* ---------------------------------------------------------------------
    Cards + buttons (shared vocabulary)

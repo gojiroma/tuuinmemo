@@ -5,11 +5,13 @@
   // Chart.js defaults to a fixed gray for text/gridlines, which reads fine
   // on a light card but goes muddy on the dark card background — keep it in
   // step with the theme tokens in static/theme.css.
+  let cardBg = '#fffdfa'; // tracked for the point halo below; kept in sync with theme.css's --card-bg
   function applyChartTheme() {
     if (typeof Chart === 'undefined') return;
     const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     Chart.defaults.color = dark ? '#c7ab8e' : '#8a7862';
     Chart.defaults.borderColor = dark ? '#3e3024' : '#ecdfd0';
+    cardBg = dark ? '#2b2119' : '#fffdfa';
     // Match the app-wide bump to bold + 1.2x size (Chart.js draws on canvas,
     // so it doesn't pick up the CSS font-weight/font-size overrides).
     Chart.defaults.font.weight = 'bold';
@@ -61,19 +63,29 @@
     return `${y}/${Number(m)}`;
   }
 
+  function hexToRgba(hex, alpha) {
+    const n = parseInt(hex.slice(1), 16);
+    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+  }
+
   const STEPS_AXIS_MAX = 10000; // bars above this are visually clipped, which is fine — the point is the trend, not exact high counts
   const STEPS_DARK_THRESHOLD = 12000;
   const STEPS_COLOR = '#7c9a52';
   const STEPS_COLOR_DARK = '#5c7a3c';
 
+  // Bars stay translucent so the sleep-score line reads clearly on top of
+  // them; a 12,000+ step day gets a solid, darker bar so it still stands out.
   function stepBarColor(value, clinicColor) {
     if (clinicColor) return clinicColor;
-    return value >= STEPS_DARK_THRESHOLD ? STEPS_COLOR_DARK : STEPS_COLOR;
+    return value >= STEPS_DARK_THRESHOLD
+      ? hexToRgba(STEPS_COLOR_DARK, 0.85)
+      : hexToRgba(STEPS_COLOR, 0.55);
   }
 
   // Sleep score thresholds so the line reads at a glance instead of needing
   // the axis checked: 90+ green, 80+ blue, 60+ orange, below that red.
   function scoreColor(score) {
+    if (score == null) return 'transparent'; // gap — no point/segment actually drawn here
     if (score >= 90) return '#6f8f45';
     if (score >= 80) return '#3f7cae';
     if (score >= 60) return '#e0793a';
@@ -112,17 +124,23 @@
     return keys;
   }
 
-  function aggregateToKeys(rawRows, dateField, valueField, mode, keys, clinicDates, convertFn) {
+  // treatZeroAsMissing: a raw value of exactly 0 is a tracking error rather
+  // than a real reading (used for sleep score — a device that failed to
+  // record sleep reports 0, it didn't score a night at zero) so it's
+  // excluded from the average, same as a day with no row at all.
+  function aggregateToKeys(rawRows, dateField, valueField, mode, keys, clinicDates, convertFn, { treatZeroAsMissing = false } = {}) {
     const groupFn = mode === 'week' ? weekStart : mode === 'month' ? monthStart : (d => d);
     const labelFn = mode === 'month' ? monthLabel : shortLabel;
     const buckets = {};
     keys.forEach(k => { buckets[k] = { sum: 0, count: 0, clinic: false }; });
 
     rawRows.forEach(r => {
-      if (r[valueField] == null) return; // e.g. legacy sleep rows with no score
+      const v = r[valueField];
+      if (v == null) return; // e.g. legacy sleep rows with no score
+      if (treatZeroAsMissing && v === 0) return;
       const key = groupFn(r[dateField]);
       if (buckets[key]) {
-        buckets[key].sum += r[valueField];
+        buckets[key].sum += v;
         buckets[key].count += 1;
       }
     });
@@ -133,7 +151,9 @@
 
     return {
       labels: keys.map(labelFn),
-      values: keys.map(k => convertFn(buckets[k].count ? buckets[k].sum / buckets[k].count : 0)),
+      // No valid reading in the bucket -> null (a real gap in the line/bar),
+      // not 0 (which would misread as an actual measured low value).
+      values: keys.map(k => buckets[k].count ? convertFn(buckets[k].sum / buckets[k].count) : null),
       colors: keys.map(k => buckets[k].clinic ? '#e0793a' : null),
     };
   }
@@ -149,7 +169,7 @@
       entries.filter(m => m.date >= start && m.date <= end).map(m => m.date)
     );
 
-    const sleepSeries = aggregateToKeys(vitals.sleep, 'date', 'score', mode, keys, clinicDates, v => +v.toFixed(1));
+    const sleepSeries = aggregateToKeys(vitals.sleep, 'date', 'score', mode, keys, clinicDates, v => +v.toFixed(1), { treatZeroAsMissing: true });
     const stepsSeries = aggregateToKeys(vitals.steps, 'date', 'steps', mode, keys, clinicDates, v => Math.round(v));
 
     if (existingChart) existingChart.destroy();
@@ -179,9 +199,14 @@
             type: 'line',
             label: '睡眠スコア',
             data: sleepSeries.values,
+            spanGaps: false, // null (no reading / a 0 tracking error) breaks the line instead of drawing a fake dip
             borderColor: '#a8763f',
             backgroundColor: '#a8763f',
+            borderWidth: 3,
             pointBackgroundColor: sleepSeries.values.map((v, i) => sleepSeries.colors[i] || scoreColor(v)),
+            // A light halo around every dot keeps it legible sitting on top of the step bars.
+            pointBorderColor: cardBg,
+            pointBorderWidth: 2,
             pointRadius: sleepSeries.colors.map(c => c ? 6 : 3),
             segment: {
               // Color each line segment by the score it's heading into, so the
@@ -221,6 +246,18 @@
             },
           },
           title: { display: true, text: `睡眠・歩数${modeTitle}` },
+          tooltip: {
+            callbacks: {
+              // Spell out units per series, and call out missing sleep-score
+              // readings explicitly instead of silently omitting the row.
+              label(ctx) {
+                if (ctx.dataset.yAxisID === 'ySteps') {
+                  return `歩数: ${ctx.parsed.y == null ? 'データなし' : ctx.parsed.y.toLocaleString() + '歩'}`;
+                }
+                return `睡眠スコア: ${ctx.parsed.y == null ? '欠損（記録なし）' : ctx.parsed.y}`;
+              },
+            },
+          },
         },
         interaction: { mode: 'index', intersect: false },
         // Hovering a clinic day hands its memo off to the caller (to select

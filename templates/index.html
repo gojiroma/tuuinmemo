@@ -180,6 +180,7 @@
   .import-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
   .import-row label.btn { display: inline-block; }
   .import-row input[type=file] { display: none; }
+  #saveChartImageBtn { margin-left: auto; }
 
   /* Edit history dialog -------------------------------------------- */
   .history-dialog {
@@ -260,7 +261,7 @@
   <h1>📋 通院メモ</h1>
   <div class="header-right">
     <button type="button" class="nav-link ui-fade" id="modeToggleBtn">✏️ 編集モードに切替</button>
-    <span id="statusBadge" class="ui-fade">オンライン</span>
+    <span id="statusBadge" class="ui-fade"></span>
   </div>
 </header>
 
@@ -285,9 +286,9 @@
       <a class="btn secondary" href="https://hanazonomental.com/" target="_blank" rel="noopener">🏥 病院のホームページ</a>
     </div>
     <div class="import-row">
-      <button class="btn secondary" id="saveChartImageBtn">🖼 グラフを画像保存</button>
       <label class="btn secondary csv-import-label">睡眠CSVインポート<input type="file" id="sleepCsvInput" accept=".csv"></label>
       <label class="btn secondary csv-import-label">歩数CSVインポート<input type="file" id="stepsCsvInput" accept=".csv"></label>
+      <button class="btn secondary" id="saveChartImageBtn">🖼 グラフを画像保存</button>
     </div>
     <div class="hint">CSVは date/day/timestamp 列 と overall_score(睡眠スコア)/steps 列を自動検出します。</div>
   </div>
@@ -296,9 +297,8 @@
 <div class="app">
   <div class="left fade-on-editor-focus">
     <div class="card">
-      <h2>エントリ一覧</h2>
       <div class="search-row">
-        <input type="search" id="searchInput" list="searchHistoryList" placeholder="🔍 キーワード検索">
+        <input type="search" id="searchInput" list="searchHistoryList" placeholder="🔍">
         <datalist id="searchHistoryList"></datalist>
       </div>
       <div class="jump-row">
@@ -316,7 +316,6 @@
     </div>
 
     <div class="editor-toolbar">
-      <h2 style="margin:0;">📝 Markdown メモ</h2>
       <div class="group">
         <button class="btn secondary" id="historyBtn">🕘 編集履歴</button>
         <button class="btn secondary" id="templateBtn">4セクション挿入</button>
@@ -446,7 +445,9 @@ async function loadEntries() {
 
 function setStatus(text, offline) {
   const badge = document.getElementById('statusBadge');
-  badge.textContent = text;
+  // Online is the expected state and doesn't need to shout about itself —
+  // only surface the badge when there's an actual problem (offline).
+  badge.textContent = offline ? text : '';
   badge.classList.toggle('offline', !!offline);
 }
 
