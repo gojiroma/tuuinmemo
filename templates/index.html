@@ -162,7 +162,7 @@
   body.view-mode #combineImagesBtn,
   body.view-mode #saveStatus,
   body.view-mode #contentEdit,
-  body.view-mode .import-row,
+  body.view-mode .import-row .csv-import-label,
   body.view-mode .external-link-row,
   body.view-mode .hint { display: none; }
   body.view-mode .editor-split { grid-template-columns: 1fr; }
@@ -256,6 +256,35 @@
   </div>
 </header>
 
+<div class="vitals-section">
+  <div class="card vitals-card">
+    <div class="vitals-toolbar">
+      <h2 style="margin:0;">📊 バイタル（睡眠・歩数）</h2>
+      <div class="period-toggle ui-fade">
+        <button class="btn secondary" data-mode="recent">直近50日</button>
+        <button class="btn secondary" data-mode="recent100">直近100日</button>
+        <button class="btn secondary" data-mode="recent200">直近200日</button>
+        <button class="btn secondary" data-mode="recent300">直近300日</button>
+        <button class="btn secondary" data-mode="week">週次</button>
+        <button class="btn secondary" data-mode="month">月次</button>
+      </div>
+    </div>
+    <div id="chartsContainer">
+      <div class="chart-box"><canvas id="vitalsChart"></canvas></div>
+    </div>
+    <div class="external-link-row">
+      <a class="btn secondary" href="https://dashboard.exercise.quest/history" target="_blank" rel="noopener">📈 Exercise Dashboard の履歴を開く</a>
+      <a class="btn secondary" href="https://hanazonomental.com/" target="_blank" rel="noopener">🏥 病院のホームページ</a>
+    </div>
+    <div class="import-row">
+      <button class="btn secondary" id="saveChartImageBtn">🖼 グラフを画像保存</button>
+      <label class="btn secondary csv-import-label">睡眠CSVインポート<input type="file" id="sleepCsvInput" accept=".csv"></label>
+      <label class="btn secondary csv-import-label">歩数CSVインポート<input type="file" id="stepsCsvInput" accept=".csv"></label>
+    </div>
+    <div class="hint">CSVは date/day/timestamp 列 と duration(分)/sleep/steps 列を自動検出します。</div>
+  </div>
+</div>
+
 <div class="app">
   <div class="left fade-on-editor-focus">
     <div class="card">
@@ -319,35 +348,6 @@
     <button type="button" class="lightbox-nav lightbox-next" id="lightboxNextBtn" aria-label="次の画像">›</button>
   </div>
 </dialog>
-
-<div class="vitals-section">
-  <div class="card vitals-card">
-    <div class="vitals-toolbar">
-      <h2 style="margin:0;">📊 バイタル（睡眠・歩数）</h2>
-      <div class="period-toggle ui-fade">
-        <button class="btn secondary" data-mode="recent">直近50日</button>
-        <button class="btn secondary" data-mode="recent100">直近100日</button>
-        <button class="btn secondary" data-mode="recent200">直近200日</button>
-        <button class="btn secondary" data-mode="recent300">直近300日</button>
-        <button class="btn secondary" data-mode="week">週次</button>
-        <button class="btn secondary" data-mode="month">月次</button>
-      </div>
-    </div>
-    <div id="chartsContainer">
-      <div class="chart-box"><canvas id="vitalsChart"></canvas></div>
-    </div>
-    <div class="external-link-row">
-      <a class="btn secondary" href="https://dashboard.exercise.quest/history" target="_blank" rel="noopener">📈 Exercise Dashboard の履歴を開く</a>
-      <a class="btn secondary" href="https://hanazonomental.com/" target="_blank" rel="noopener">🏥 病院のホームページ</a>
-    </div>
-    <div class="import-row">
-      <button class="btn secondary" id="saveChartImageBtn">🖼 グラフを画像保存</button>
-      <label class="btn secondary">睡眠CSVインポート<input type="file" id="sleepCsvInput" accept=".csv"></label>
-      <label class="btn secondary">歩数CSVインポート<input type="file" id="stepsCsvInput" accept=".csv"></label>
-    </div>
-    <div class="hint">CSVは date/day/timestamp 列 と duration(分)/sleep/steps 列を自動検出します。</div>
-  </div>
-</div>
 
 <footer>通院メモ &middot; データは Neon PostgreSQL に保存されます</footer>
 
