@@ -704,7 +704,7 @@ async function importCsv(inputEl, type) {
     const res = await fetch('/api/vitals/import-csv', { method: 'POST', body: form });
     const result = await res.json();
     if (!res.ok) throw new Error(result.error || 'import failed');
-    alert(`${result.imported}件インポートしました（${result.skipped}件スキップ）`);
+    alert(`${result.imported}件インポートしました（既存の日付は上書き。形式エラーで${result.skipped}件スキップ）`);
     loadVitals();
   } catch (e) {
     alert('インポートに失敗しました: ' + e.message);
