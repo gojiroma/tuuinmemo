@@ -57,6 +57,25 @@
     return `${y}/${Number(m)}`;
   }
 
+  const STEPS_AXIS_MAX = 10000; // bars above this are visually clipped, which is fine — the point is the trend, not exact high counts
+  const STEPS_DARK_THRESHOLD = 12000;
+  const STEPS_COLOR = '#7c9a52';
+  const STEPS_COLOR_DARK = '#5c7a3c';
+
+  function stepBarColor(value, clinicColor) {
+    if (clinicColor) return clinicColor;
+    return value >= STEPS_DARK_THRESHOLD ? STEPS_COLOR_DARK : STEPS_COLOR;
+  }
+
+  // Sleep score thresholds so the line reads at a glance instead of needing
+  // the axis checked: 90+ green, 80+ blue, 60+ orange, below that red.
+  function scoreColor(score) {
+    if (score >= 90) return '#6f8f45';
+    if (score >= 80) return '#3f7cae';
+    if (score >= 60) return '#e0793a';
+    return '#b23b2c';
+  }
+
   const RECENT_DAYS = 50; // default for the plain 'recent' mode (kept for backward compat)
   const FIXED_RANGE_START = '2025-12-01'; // week/month: fixed start covering all entries, not a rolling window
 
@@ -149,7 +168,7 @@
             type: 'bar',
             label: '歩数',
             data: stepsSeries.values,
-            backgroundColor: stepsSeries.colors.map(c => c || '#7c9a52'),
+            backgroundColor: stepsSeries.values.map((v, i) => stepBarColor(v, stepsSeries.colors[i])),
             yAxisID: 'ySteps',
           },
           {
@@ -158,8 +177,13 @@
             data: sleepSeries.values,
             borderColor: '#a8763f',
             backgroundColor: '#a8763f',
-            pointBackgroundColor: sleepSeries.colors.map(c => c || '#a8763f'),
+            pointBackgroundColor: sleepSeries.values.map((v, i) => sleepSeries.colors[i] || scoreColor(v)),
             pointRadius: sleepSeries.colors.map(c => c ? 6 : 3),
+            segment: {
+              // Color each line segment by the score it's heading into, so the
+              // trend itself carries the green/blue/orange/red read, not just the dots.
+              borderColor: ctx => scoreColor(ctx.p1.parsed.y),
+            },
             tension: 0.25,
             yAxisID: 'ySleep',
           },
@@ -209,7 +233,7 @@
           if (memo) onHoverEntry(memo);
         },
         scales: {
-          ySteps: { type: 'linear', position: 'left', beginAtZero: true, title: { display: true, text: '歩数' } },
+          ySteps: { type: 'linear', position: 'left', beginAtZero: true, max: STEPS_AXIS_MAX, title: { display: true, text: '歩数' } },
           ySleep: { type: 'linear', position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, title: { display: true, text: '睡眠スコア' } },
         },
       },
