@@ -16,6 +16,7 @@
   --danger: #b23b2c;
   --danger-dim: #fbeae6;
   --success: #6f8f45;
+  --success-dim: #eef3e2;
   --radius: 14px;
   --radius-sm: 10px;
   --shadow-sm: 0 1px 2px rgba(120, 72, 32, 0.08);
@@ -42,6 +43,7 @@
     --danger: #e17e6a;
     --danger-dim: #3d2721;
     --success: #a3c076;
+    --success-dim: #2b3320;
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
     --shadow-md: 0 10px 28px rgba(0, 0, 0, 0.45);
   }

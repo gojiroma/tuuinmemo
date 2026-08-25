@@ -183,32 +183,40 @@
 
   /* Edit history dialog -------------------------------------------- */
   .history-dialog {
-    width: min(640px, 90vw);
-    max-height: 80vh;
+    width: min(680px, 92vw);
+    max-height: 84vh;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 16px;
     background: var(--card-bg);
     color: var(--text);
+    display: flex;
+    flex-direction: column;
   }
   .history-dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
   .history-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-  .history-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 60vh; }
-  .history-item {
+  .history-slider-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .history-slider-row input[type=range] { width: 100%; accent-color: var(--accent); }
+  .history-slider-label { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 0.8rem; }
+  .history-slider-time { font-weight: 600; }
+  .history-slider-position { color: var(--text-faint); flex-shrink: 0; }
+  .history-preview {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 200px;
+    max-height: 50vh;
     border: 1px solid var(--border-soft);
     border-radius: var(--radius-sm);
     padding: 8px 10px;
+    font-size: 0.85rem;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    word-break: break-word;
   }
-  .history-item-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 4px; }
-  .history-item-time { font-size: 0.78rem; color: var(--text-dim); }
-  .history-item-preview {
-    font-size: 0.82rem;
-    color: var(--text-dim);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    margin-bottom: 6px;
-  }
+  .history-diff-line { display: block; padding: 1px 4px; border-radius: 4px; }
+  .history-diff-line.added { background: var(--success-dim); color: var(--success); }
+  .history-diff-line.removed { background: var(--danger-dim); color: var(--danger); text-decoration: line-through; }
+  .history-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
   .history-empty { font-size: 0.82rem; color: var(--text-dim); padding: 8px 4px; }
 
   /* Image lightbox (click a preview image to view it full-size) ---- */
@@ -331,7 +339,19 @@
     <h2 style="margin:0;">🕘 編集履歴</h2>
     <button type="button" class="btn secondary" id="historyCloseBtn">閉じる</button>
   </div>
-  <div id="historyList" class="history-list"></div>
+  <div id="historyBody">
+    <div class="history-slider-row">
+      <input type="range" id="historySlider" min="0" max="0" value="0" step="1">
+      <div class="history-slider-label">
+        <span class="history-slider-time" id="historySliderTime"></span>
+        <span class="history-slider-position" id="historySliderPosition"></span>
+      </div>
+    </div>
+    <div id="historyPreview" class="history-preview"></div>
+    <div class="history-actions">
+      <button type="button" class="btn secondary" id="historyRestoreBtn">この内容を復元</button>
+    </div>
+  </div>
 </dialog>
 
 <dialog id="imageLightbox" class="lightbox-dialog">
@@ -848,14 +868,74 @@ function formatHistoryTime(iso) {
   return `${dateStr} ${hh}:${mm}`;
 }
 
+// Line-based diff (LCS) so the preview can show what was added/removed
+// versus the previous checkpoint, not just the raw text.
+function diffLines(oldText, newText) {
+  const oldLines = (oldText || '').split('\n');
+  const newLines = (newText || '').split('\n');
+  const n = oldLines.length, m = newLines.length;
+  const dp = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      dp[i][j] = oldLines[i] === newLines[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+  const result = [];
+  let i = 0, j = 0;
+  while (i < n && j < m) {
+    if (oldLines[i] === newLines[j]) {
+      result.push({ type: 'same', text: oldLines[i] });
+      i++; j++;
+    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+      result.push({ type: 'removed', text: oldLines[i] });
+      i++;
+    } else {
+      result.push({ type: 'added', text: newLines[j] });
+      j++;
+    }
+  }
+  while (i < n) { result.push({ type: 'removed', text: oldLines[i] }); i++; }
+  while (j < m) { result.push({ type: 'added', text: newLines[j] }); j++; }
+  return result;
+}
+
+let historyVersions = []; // oldest -> newest
+
+function showHistoryMessage(msg) {
+  document.getElementById('historySlider').closest('.history-slider-row').style.display = 'none';
+  document.getElementById('historyRestoreBtn').closest('.history-actions').style.display = 'none';
+  document.getElementById('historyPreview').innerHTML = `<div class="history-empty">${msg}</div>`;
+}
+
+function renderHistorySlider() {
+  const index = Number(document.getElementById('historySlider').value);
+  const version = historyVersions[index];
+  const prevContent = index > 0 ? historyVersions[index - 1].content : '';
+
+  document.getElementById('historySliderTime').textContent = formatHistoryTime(version.archived_at);
+  document.getElementById('historySliderPosition').textContent = `${index + 1} / ${historyVersions.length}`;
+
+  const previewEl = document.getElementById('historyPreview');
+  previewEl.innerHTML = '';
+  const diff = diffLines(prevContent, version.content || '');
+  diff.forEach(line => {
+    const el = document.createElement('span');
+    el.className = `history-diff-line ${line.type}`;
+    el.textContent = line.text || ' ';
+    previewEl.appendChild(el);
+  });
+}
+
 async function openHistoryDialog() {
-  const listEl = document.getElementById('historyList');
   const dialog = document.getElementById('historyDialog');
-  listEl.innerHTML = '<div class="history-empty">読み込み中…</div>';
+  const slider = document.getElementById('historySlider');
+  document.getElementById('historySlider').closest('.history-slider-row').style.display = '';
+  document.getElementById('historyRestoreBtn').closest('.history-actions').style.display = '';
+  document.getElementById('historyPreview').innerHTML = '<div class="history-empty">読み込み中…</div>';
   dialog.showModal();
 
   if (!state.currentMemoId) {
-    listEl.innerHTML = '<div class="history-empty">このエントリはまだ保存されていません。</div>';
+    showHistoryMessage('このエントリはまだ保存されていません。');
     return;
   }
 
@@ -863,49 +943,33 @@ async function openHistoryDialog() {
   try {
     versions = await apiGet(`/api/memo/${state.currentMemoId}/history`);
   } catch (e) {
-    listEl.innerHTML = '<div class="history-empty">履歴の取得に失敗しました。</div>';
+    showHistoryMessage('履歴の取得に失敗しました。');
     return;
   }
 
   if (!versions.length) {
-    listEl.innerHTML = '<div class="history-empty">まだ履歴はありません（十分な間隔を空けて上書きすると記録されます）。</div>';
+    showHistoryMessage('まだ履歴はありません（十分な間隔を空けて上書きすると記録されます）。');
     return;
   }
 
-  listEl.innerHTML = '';
-  versions.forEach(v => {
-    const item = document.createElement('div');
-    item.className = 'history-item';
-
-    const head = document.createElement('div');
-    head.className = 'history-item-head';
-    const time = document.createElement('span');
-    time.className = 'history-item-time';
-    time.textContent = formatHistoryTime(v.archived_at);
-    head.appendChild(time);
-    const restoreBtn = document.createElement('button');
-    restoreBtn.className = 'btn secondary';
-    restoreBtn.type = 'button';
-    restoreBtn.textContent = 'この内容を復元';
-    restoreBtn.addEventListener('click', () => {
-      if (!confirm('現在の内容をこの履歴で置き換えますか？（置き換え後に保存されます）')) return;
-      const el = document.getElementById('contentEdit');
-      el.value = v.content || '';
-      onFormInput();
-      updatePreview();
-      dialog.close();
-    });
-    head.appendChild(restoreBtn);
-    item.appendChild(head);
-
-    const preview = document.createElement('div');
-    preview.className = 'history-item-preview';
-    preview.textContent = firstLine(v.content) || '（内容なし）';
-    item.appendChild(preview);
-
-    listEl.appendChild(item);
-  });
+  historyVersions = versions.slice().reverse(); // oldest -> newest
+  slider.min = 0;
+  slider.max = historyVersions.length - 1;
+  slider.value = historyVersions.length - 1; // default to the most recent checkpoint
+  renderHistorySlider();
 }
+
+document.getElementById('historySlider').addEventListener('input', renderHistorySlider);
+document.getElementById('historyRestoreBtn').addEventListener('click', () => {
+  const version = historyVersions[Number(document.getElementById('historySlider').value)];
+  if (!version) return;
+  if (!confirm('現在の内容をこの履歴で置き換えますか？（置き換え後に保存されます）')) return;
+  const el = document.getElementById('contentEdit');
+  el.value = version.content || '';
+  onFormInput();
+  updatePreview();
+  document.getElementById('historyDialog').close();
+});
 
 document.getElementById('historyBtn').addEventListener('click', openHistoryDialog);
 document.getElementById('historyCloseBtn').addEventListener('click', () => {
