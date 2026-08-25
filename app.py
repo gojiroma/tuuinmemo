@@ -114,13 +114,23 @@ def upsert_memo():
             if existing and existing["content"] != content:
                 age = (datetime.now(timezone.utc) - existing["updated_at"]).total_seconds()
                 if age > HISTORY_MIN_INTERVAL_SECONDS:
-                    cur.execute(
-                        """
-                        INSERT INTO memo_history (memo_id, date, summary, content, archived_at)
-                        VALUES (%s, %s, %s, %s, %s)
-                        """,
-                        (existing["id"], existing["date"], existing["summary"], existing["content"], existing["updated_at"]),
-                    )
+                    # Wrapped in a savepoint so that if this fails (e.g. the
+                    # memo_history table hasn't been migrated in yet), the
+                    # actual memo save below still goes through instead of
+                    # the whole request failing.
+                    try:
+                        cur.execute("SAVEPOINT memo_history_checkpoint")
+                        cur.execute(
+                            """
+                            INSERT INTO memo_history (memo_id, date, summary, content, archived_at)
+                            VALUES (%s, %s, %s, %s, %s)
+                            """,
+                            (existing["id"], existing["date"], existing["summary"], existing["content"], existing["updated_at"]),
+                        )
+                        cur.execute("RELEASE SAVEPOINT memo_history_checkpoint")
+                    except psycopg2.Error as e:
+                        cur.execute("ROLLBACK TO SAVEPOINT memo_history_checkpoint")
+                        print(f"[memo_history] checkpoint failed, continuing without it: {e}")
 
             cur.execute(
                 """
