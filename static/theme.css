@@ -1,25 +1,25 @@
 /* Shared design tokens + base chrome for 通院メモ (edit + view pages). */
 
 :root {
-  --bg: #f3f5f8;
-  --bg-elevated: #ffffff;
-  --card-bg: #ffffff;
-  --border: #e2e6ec;
-  --border-soft: #edf0f4;
-  --text: #1c222b;
-  --text-dim: #667085;
-  --text-faint: #98a2b3;
-  --accent: #3a6ea5;
-  --accent-hover: #2f5c8a;
-  --accent-dim: #eaf1f8;
-  --accent-soft: #d7e6f4;
-  --danger: #c0392b;
-  --danger-dim: #fbeceb;
-  --success: #2f8f5b;
-  --radius: 12px;
-  --radius-sm: 8px;
-  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
-  --shadow-md: 0 6px 20px rgba(16, 24, 40, 0.08);
+  --bg: #faf6f0;
+  --bg-elevated: #fffdfa;
+  --card-bg: #fffdfa;
+  --border: #ecdfd0;
+  --border-soft: #f4ebe0;
+  --text: #362b22;
+  --text-dim: #8a7862;
+  --text-faint: #b7a892;
+  --accent: #b5533a;
+  --accent-hover: #984631;
+  --accent-dim: #fbece5;
+  --accent-soft: #f0cebd;
+  --danger: #b23b2c;
+  --danger-dim: #fbeae6;
+  --success: #6f8f45;
+  --radius: 14px;
+  --radius-sm: 10px;
+  --shadow-sm: 0 1px 2px rgba(120, 72, 32, 0.08);
+  --shadow-md: 0 6px 20px rgba(120, 72, 32, 0.12);
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
   --t-fast: 0.15s var(--ease);
   --t: 0.25s var(--ease);
@@ -27,21 +27,21 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #12151a;
-    --bg-elevated: #1a1e25;
-    --card-bg: #1a1e25;
-    --border: #2a2f39;
-    --border-soft: #232833;
-    --text: #e7eaef;
-    --text-dim: #9aa4b3;
-    --text-faint: #6b7481;
-    --accent: #6ba3db;
-    --accent-hover: #8bb8e4;
-    --accent-dim: #1e2b3c;
-    --accent-soft: #26364a;
-    --danger: #e3776a;
-    --danger-dim: #3a2422;
-    --success: #57b787;
+    --bg: #201812;
+    --bg-elevated: #2b2119;
+    --card-bg: #2b2119;
+    --border: #3e3024;
+    --border-soft: #35291f;
+    --text: #f3e7d9;
+    --text-dim: #c7ab8e;
+    --text-faint: #94795f;
+    --accent: #e08260;
+    --accent-hover: #eb9979;
+    --accent-dim: #3c281d;
+    --accent-soft: #4d3527;
+    --danger: #e17e6a;
+    --danger-dim: #3d2721;
+    --success: #a3c076;
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
     --shadow-md: 0 10px 28px rgba(0, 0, 0, 0.45);
   }
@@ -100,7 +100,7 @@ header .nav-link:hover { background: rgba(255, 255, 255, 0.16); }
   background: rgba(255, 255, 255, 0.2);
   transition: background var(--t-fast), opacity var(--t);
 }
-#statusBadge.offline { background: #c0392b; }
+#statusBadge.offline { background: var(--danger); }
 
 /* ---------------------------------------------------------------------
    Cards + buttons (shared vocabulary)

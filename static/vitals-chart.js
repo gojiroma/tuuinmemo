@@ -8,8 +8,8 @@
   function applyChartTheme() {
     if (typeof Chart === 'undefined') return;
     const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    Chart.defaults.color = dark ? '#9aa4b3' : '#667085';
-    Chart.defaults.borderColor = dark ? '#2a2f39' : '#e2e6ec';
+    Chart.defaults.color = dark ? '#c7ab8e' : '#8a7862';
+    Chart.defaults.borderColor = dark ? '#3e3024' : '#ecdfd0';
   }
   applyChartTheme();
   if (window.matchMedia) {
@@ -148,16 +148,16 @@
             type: 'bar',
             label: '歩数',
             data: stepsSeries.values,
-            backgroundColor: stepsSeries.colors.map(c => c || '#4a9e6f'),
+            backgroundColor: stepsSeries.colors.map(c => c || '#7c9a52'),
             yAxisID: 'ySteps',
           },
           {
             type: 'line',
             label: '睡眠(時間)',
             data: sleepSeries.values,
-            borderColor: '#3a6ea5',
-            backgroundColor: '#3a6ea5',
-            pointBackgroundColor: sleepSeries.colors.map(c => c || '#3a6ea5'),
+            borderColor: '#a8763f',
+            backgroundColor: '#a8763f',
+            pointBackgroundColor: sleepSeries.colors.map(c => c || '#a8763f'),
             pointRadius: sleepSeries.colors.map(c => c ? 6 : 3),
             tension: 0.25,
             yAxisID: 'ySleep',
