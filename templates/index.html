@@ -112,6 +112,17 @@
   }
   #contentView h2 { font-size: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
   #contentView :first-child { margin-top: 0; }
+  #contentView img {
+    display: block;
+    max-width: 100%;
+    max-height: 220px;
+    object-fit: contain;
+    border-radius: var(--radius-sm);
+    margin: 8px 0;
+    cursor: zoom-in;
+    transition: opacity var(--t-fast);
+  }
+  #contentView img:hover { opacity: 0.85; }
   .status-row { display: flex; justify-content: flex-end; align-items: center; }
   #saveStatus { font-size: 0.78rem; color: var(--text-faint); transition: color var(--t); min-height: 1em; }
   #saveStatus.saved { color: var(--success); }
@@ -176,6 +187,41 @@
     margin-bottom: 6px;
   }
   .history-empty { font-size: 0.82rem; color: var(--text-dim); padding: 8px 4px; }
+
+  /* Image lightbox (click a preview image to view it full-size) ---- */
+  .lightbox-dialog {
+    width: min(920px, 95vw);
+    max-height: 92vh;
+    border: none;
+    border-radius: var(--radius);
+    padding: 0;
+    background: #14161a;
+    color: #fff;
+  }
+  .lightbox-dialog::backdrop { background: rgba(0, 0, 0, 0.75); }
+  .lightbox-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; }
+  .lightbox-toolbar .btn.secondary { color: #fff; border-color: rgba(255, 255, 255, 0.5); }
+  .lightbox-toolbar .btn.secondary:hover { background: rgba(255, 255, 255, 0.15); }
+  .lightbox-counter { font-size: 0.8rem; color: rgba(255, 255, 255, 0.75); }
+  .lightbox-body { position: relative; display: flex; align-items: center; justify-content: center; min-height: 200px; max-height: 80vh; }
+  .lightbox-body img { max-width: 100%; max-height: 80vh; object-fit: contain; }
+  .lightbox-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.4);
+    color: #fff;
+    border: none;
+    font-size: 1.6rem;
+    line-height: 1;
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .lightbox-nav:hover { background: rgba(0, 0, 0, 0.65); }
+  .lightbox-prev { left: 8px; }
+  .lightbox-next { right: 8px; }
 </style>
 </head>
 <body>
@@ -234,6 +280,21 @@
     <button type="button" class="btn secondary" id="historyCloseBtn">閉じる</button>
   </div>
   <div id="historyList" class="history-list"></div>
+</dialog>
+
+<dialog id="imageLightbox" class="lightbox-dialog">
+  <div class="lightbox-toolbar">
+    <span class="lightbox-counter" id="lightboxCounter"></span>
+    <div style="display:flex; gap:6px;">
+      <a class="btn secondary" id="lightboxDownload" download>⬇ ダウンロード</a>
+      <button type="button" class="btn secondary" id="lightboxCloseBtn">閉じる</button>
+    </div>
+  </div>
+  <div class="lightbox-body">
+    <button type="button" class="lightbox-nav lightbox-prev" id="lightboxPrevBtn" aria-label="前の画像">‹</button>
+    <img id="lightboxImage" alt="">
+    <button type="button" class="lightbox-nav lightbox-next" id="lightboxNextBtn" aria-label="次の画像">›</button>
+  </div>
 </dialog>
 
 <div class="vitals-section">
@@ -564,6 +625,67 @@ function updatePreview() {
     ? marked.parse(content)
     : '<p style="color:var(--text-faint);">（内容なし）</p>';
 }
+
+// ---------------------------------------------------------------------
+// Image lightbox: click a preview thumbnail to view it full-size, with
+// prev/next between the memo's other images (carousel-style) and a
+// download button.
+// ---------------------------------------------------------------------
+
+const lightboxState = { urls: [], index: 0 };
+
+function filenameFromImageUrl(url) {
+  if (url.startsWith('data:')) {
+    const m = /^data:image\/(\w+)/.exec(url);
+    return `image.${m ? m[1].replace('svg+xml', 'svg') : 'png'}`;
+  }
+  return (url.split('/').pop() || 'image').split('?')[0].split('#')[0] || 'image';
+}
+
+function renderLightbox() {
+  const { urls, index } = lightboxState;
+  const url = urls[index];
+  document.getElementById('lightboxImage').src = url;
+
+  const multi = urls.length > 1;
+  document.getElementById('lightboxCounter').textContent = multi ? `${index + 1} / ${urls.length}` : '';
+  document.getElementById('lightboxPrevBtn').style.display = multi ? '' : 'none';
+  document.getElementById('lightboxNextBtn').style.display = multi ? '' : 'none';
+
+  const dl = document.getElementById('lightboxDownload');
+  dl.href = url;
+  dl.download = filenameFromImageUrl(url);
+}
+
+function openLightbox(urls, index) {
+  lightboxState.urls = urls;
+  lightboxState.index = index;
+  renderLightbox();
+  document.getElementById('imageLightbox').showModal();
+}
+
+document.getElementById('contentView').addEventListener('click', (e) => {
+  const clicked = e.target.closest('img');
+  if (!clicked) return;
+  const imgs = Array.from(document.getElementById('contentView').querySelectorAll('img'));
+  openLightbox(imgs.map(img => img.src), imgs.indexOf(clicked));
+});
+
+document.getElementById('lightboxPrevBtn').addEventListener('click', () => {
+  lightboxState.index = (lightboxState.index - 1 + lightboxState.urls.length) % lightboxState.urls.length;
+  renderLightbox();
+});
+document.getElementById('lightboxNextBtn').addEventListener('click', () => {
+  lightboxState.index = (lightboxState.index + 1) % lightboxState.urls.length;
+  renderLightbox();
+});
+document.getElementById('lightboxCloseBtn').addEventListener('click', () => {
+  document.getElementById('imageLightbox').close();
+});
+document.getElementById('imageLightbox').addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowLeft') document.getElementById('lightboxPrevBtn').click();
+  if (e.key === 'ArrowRight') document.getElementById('lightboxNextBtn').click();
+});
 
 function setSaveStatus(text, kind) {
   const el = document.getElementById('saveStatus');
