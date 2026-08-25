@@ -118,11 +118,33 @@
     max-height: 220px;
     object-fit: contain;
     border-radius: var(--radius-sm);
-    margin: 8px 0;
     cursor: zoom-in;
     transition: opacity var(--t-fast);
   }
-  #contentView img:hover { opacity: 0.85; }
+  #contentView .img-frame {
+    display: block;
+    width: fit-content;
+    max-width: 100%;
+    margin: 8px 0;
+    position: relative;
+  }
+  #contentView .img-frame:hover img { opacity: 0.85; }
+  #contentView .img-hint {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    font-size: 0.78rem;
+    border-radius: var(--radius-sm);
+    opacity: 0;
+    transition: opacity var(--t-fast);
+    pointer-events: none;
+  }
+  #contentView .img-frame:hover .img-hint { opacity: 1; }
   .status-row { display: flex; justify-content: flex-end; align-items: center; }
   #saveStatus { font-size: 0.78rem; color: var(--text-faint); transition: color var(--t); min-height: 1em; }
   #saveStatus.saved { color: var(--success); }
@@ -624,6 +646,23 @@ function updatePreview() {
   document.getElementById('contentView').innerHTML = content.trim()
     ? marked.parse(content)
     : '<p style="color:var(--text-faint);">（内容なし）</p>';
+  decorateContentImages();
+}
+
+// Wrap each preview image in a frame that shows a "クリックして拡大" hint
+// on hover, so it's clear the (shrunk) thumbnail opens a full-size lightbox.
+function decorateContentImages() {
+  document.getElementById('contentView').querySelectorAll('img').forEach(img => {
+    const frame = document.createElement('span');
+    frame.className = 'img-frame';
+    img.replaceWith(frame);
+    frame.appendChild(img);
+
+    const hint = document.createElement('span');
+    hint.className = 'img-hint';
+    hint.textContent = '🔍 クリックして拡大';
+    frame.appendChild(hint);
+  });
 }
 
 // ---------------------------------------------------------------------
@@ -944,14 +983,20 @@ document.getElementById('combineImagesBtn').addEventListener('click', async () =
 // ---------------------------------------------------------------------
 
 function renderCharts() {
-  vitalsChart = VitalsChart.renderVitalsChart(
-    document.getElementById('vitalsChart'),
-    vitalsChart,
-    state.entries,
-    state.vitals,
-    state.vitalsMode,
-    memo => selectDate(memo.date) // hovering a clinic day loads it into the editor
-  );
+  // Guarded so that a charting failure (e.g. Chart.js CDN hiccup) can't
+  // break the callers that also load entries/the editor in the same flow.
+  try {
+    vitalsChart = VitalsChart.renderVitalsChart(
+      document.getElementById('vitalsChart'),
+      vitalsChart,
+      state.entries,
+      state.vitals,
+      state.vitalsMode,
+      memo => selectDate(memo.date) // hovering a clinic day loads it into the editor
+    );
+  } catch (e) {
+    console.warn('renderCharts failed', e);
+  }
 }
 
 async function loadVitals() {
@@ -1046,6 +1091,13 @@ document.getElementById('jumpDateInput').value = state.selectedDate;
 setStatus(navigator.onLine ? 'オンライン' : 'オフライン', !navigator.onLine);
 
 loadEntries().then(() => {
+  // Land on the latest entry rather than today's (likely blank) date, since
+  // the page always opens in view mode first.
+  if (state.entries.length) {
+    state.selectedDate = state.entries[0].date;
+    document.getElementById('jumpDateInput').value = state.selectedDate;
+  }
+  renderEntryList();
   loadEditorForSelectedDate();
   if (navigator.onLine) syncPendingDrafts();
 });
