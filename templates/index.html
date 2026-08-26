@@ -191,9 +191,12 @@
     padding: 16px;
     background: var(--card-bg);
     color: var(--text);
-    display: flex;
-    flex-direction: column;
   }
+  /* Scoped to [open]: setting display here (rather than on the bare
+     .history-dialog selector) keeps the UA's dialog:not([open]) { display:
+     none } in effect while closed — an author display rule on the bare
+     selector would otherwise win and render the dialog inline on the page. */
+  .history-dialog[open] { display: flex; flex-direction: column; }
   .history-dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
   .history-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
   .history-slider-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
