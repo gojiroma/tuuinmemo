@@ -3,6 +3,7 @@ import hmac
 import io
 import os
 import re
+import secrets
 from datetime import date, datetime, timedelta, timezone
 from functools import wraps
 
@@ -15,21 +16,53 @@ app = Flask(__name__)
 DATABASE_URL = os.environ.get("DATABASE_URL")
 ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN")
 
+GUEST_LINK_DEFAULT_HOURS = 24
+GUEST_LINK_MAX_HOURS = 24 * 30  # 30 days
 
-def require_admin_token(view):
+
+def is_valid_guest_token(token):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT 1 FROM guest_links WHERE token = %s AND revoked_at IS NULL AND expires_at > now()",
+                (token,),
+            )
+            return cur.fetchone() is not None
+
+
+def classify_token(token):
+    # Returns "admin" for the operator's own token (full read/write), "guest"
+    # for a live (unrevoked, unexpired) link an admin issued for someone else
+    # (read-only), or None if neither matches.
+    if not token:
+        return None
+    if ADMIN_TOKEN and hmac.compare_digest(token, ADMIN_TOKEN):
+        return "admin"
+    if is_valid_guest_token(token):
+        return "guest"
+    return None
+
+
+def require_access(admin_only=False):
     # Gates the memo/vitals content behind a shared secret so the (unauthenticated,
     # private-URL) app doesn't expose content to anyone who merely has the link.
-    # The token travels as the X-Admin-Token header, or ?token= for the CSV
+    # The token travels as the X-Access-Token header, or ?token= for the CSV
     # import form/file download style requests that can't set headers.
-    @wraps(view)
-    def wrapped(*args, **kwargs):
-        if not ADMIN_TOKEN:
-            return jsonify({"error": "server not configured: ADMIN_TOKEN is not set"}), 503
-        supplied = request.headers.get("X-Admin-Token") or request.args.get("token") or ""
-        if not hmac.compare_digest(supplied, ADMIN_TOKEN):
-            return jsonify({"error": "admin token required"}), 401
-        return view(*args, **kwargs)
-    return wrapped
+    def decorator(view):
+        @wraps(view)
+        def wrapped(*args, **kwargs):
+            if not ADMIN_TOKEN:
+                return jsonify({"error": "server not configured: ADMIN_TOKEN is not set"}), 503
+            supplied = request.headers.get("X-Access-Token") or request.args.get("token") or ""
+            role = classify_token(supplied)
+            if role is None:
+                return jsonify({"error": "access token required"}), 401
+            if admin_only and role != "admin":
+                return jsonify({"error": "admin token required"}), 403
+            request.access_role = role
+            return view(*args, **kwargs)
+        return wrapped
+    return decorator
 
 
 def get_conn():
@@ -94,13 +127,13 @@ def row_to_memo(row):
 # ---------------------------------------------------------------------------
 
 @app.route("/api/auth/check", methods=["GET"])
-@require_admin_token
+@require_access()
 def auth_check():
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "role": request.access_role})
 
 
 @app.route("/api/memo", methods=["GET"])
-@require_admin_token
+@require_access()
 def list_memos():
     qdate = request.args.get("date")
     limit = min(int(request.args.get("limit", 200)), 5000)
@@ -120,7 +153,7 @@ HISTORY_MIN_INTERVAL_SECONDS = 600  # only checkpoint a version if this much tim
 
 
 @app.route("/api/memo", methods=["POST"])
-@require_admin_token
+@require_access(admin_only=True)
 def upsert_memo():
     data = request.get_json(force=True, silent=True) or {}
     memo_date = data.get("date")
@@ -178,7 +211,7 @@ def upsert_memo():
 
 
 @app.route("/api/memo/<memo_id>/history", methods=["GET"])
-@require_admin_token
+@require_access()
 def get_memo_history(memo_id):
     limit = min(int(request.args.get("limit", 50)), 200)
     with get_conn() as conn:
@@ -209,7 +242,7 @@ def get_memo_history(memo_id):
 
 
 @app.route("/api/memo/<memo_id>", methods=["GET"])
-@require_admin_token
+@require_access()
 def get_memo(memo_id):
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -222,7 +255,7 @@ def get_memo(memo_id):
 
 
 @app.route("/api/memo/<memo_id>", methods=["PUT"])
-@require_admin_token
+@require_access(admin_only=True)
 def update_memo(memo_id):
     data = request.get_json(force=True, silent=True) or {}
 
@@ -259,7 +292,7 @@ def update_memo(memo_id):
 
 
 @app.route("/api/memo/<memo_id>", methods=["DELETE"])
-@require_admin_token
+@require_access(admin_only=True)
 def delete_memo(memo_id):
     with get_conn() as conn:
         with conn.cursor() as cur:
@@ -273,12 +306,83 @@ def delete_memo(memo_id):
 
 
 # ---------------------------------------------------------------------------
+# Guest links (admin-issued, time-limited, read-only access for someone
+# without the admin token, e.g. a doctor viewing on their own device)
+# ---------------------------------------------------------------------------
+
+def row_to_guest_link(row):
+    return {
+        "id": str(row["id"]),
+        "token": row["token"],
+        "created_at": row["created_at"].isoformat(),
+        "expires_at": row["expires_at"].isoformat(),
+        "revoked": row["revoked_at"] is not None,
+        "expired": row["expires_at"] <= datetime.now(timezone.utc),
+    }
+
+
+@app.route("/api/guest-links", methods=["GET"])
+@require_access(admin_only=True)
+def list_guest_links():
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT * FROM guest_links ORDER BY created_at DESC LIMIT 100")
+            rows = cur.fetchall()
+
+    return jsonify([row_to_guest_link(r) for r in rows])
+
+
+@app.route("/api/guest-links", methods=["POST"])
+@require_access(admin_only=True)
+def create_guest_link():
+    data = request.get_json(force=True, silent=True) or {}
+    hours = data.get("hours", GUEST_LINK_DEFAULT_HOURS)
+    try:
+        hours = float(hours)
+    except (TypeError, ValueError):
+        return jsonify({"error": "hours must be a number"}), 400
+    if not (0 < hours <= GUEST_LINK_MAX_HOURS):
+        return jsonify({"error": f"hours must be between 0 and {GUEST_LINK_MAX_HOURS}"}), 400
+
+    token = secrets.token_urlsafe(24)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=hours)
+
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "INSERT INTO guest_links (token, expires_at) VALUES (%s, %s) RETURNING *",
+                (token, expires_at),
+            )
+            row = cur.fetchone()
+        conn.commit()
+
+    return jsonify(row_to_guest_link(row)), 201
+
+
+@app.route("/api/guest-links/<link_id>", methods=["DELETE"])
+@require_access(admin_only=True)
+def revoke_guest_link(link_id):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE guest_links SET revoked_at = now() WHERE id = %s AND revoked_at IS NULL RETURNING id",
+                (link_id,),
+            )
+            updated = cur.fetchone()
+        conn.commit()
+
+    if not updated:
+        return jsonify({"error": "not found or already revoked"}), 404
+    return jsonify({"ok": True})
+
+
+# ---------------------------------------------------------------------------
 # Search history (keyword search itself runs client-side over all loaded
 # entries; this just remembers past search terms for suggestions)
 # ---------------------------------------------------------------------------
 
 @app.route("/api/search-history", methods=["GET"])
-@require_admin_token
+@require_access()
 def list_search_history():
     limit = min(int(request.args.get("limit", 20)), 100)
     with get_conn() as conn:
@@ -293,7 +397,7 @@ def list_search_history():
 
 
 @app.route("/api/search-history", methods=["POST"])
-@require_admin_token
+@require_access(admin_only=True)
 def save_search_history():
     data = request.get_json(force=True, silent=True) or {}
     query = (data.get("query") or "").strip()
@@ -319,7 +423,7 @@ def save_search_history():
 # ---------------------------------------------------------------------------
 
 @app.route("/api/vitals", methods=["GET"])
-@require_admin_token
+@require_access()
 def get_vitals():
     end = request.args.get("end") or date.today().isoformat()
     start = request.args.get("start") or (date.fromisoformat(end) - timedelta(days=49)).isoformat()
@@ -371,7 +475,7 @@ def parse_date_cell(value):
 
 
 @app.route("/api/vitals/import-csv", methods=["POST"])
-@require_admin_token
+@require_access(admin_only=True)
 def import_vitals_csv():
     data_type = request.form.get("type") or request.args.get("type")
     if data_type not in ("sleep", "steps"):

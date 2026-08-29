@@ -63,3 +63,14 @@ CREATE TABLE IF NOT EXISTS memo_search_history (
 );
 
 CREATE INDEX IF NOT EXISTS idx_memo_search_history_searched_at ON memo_search_history (searched_at DESC);
+
+-- ゲスト閲覧リンク（管理者が発行する期限付き・閲覧専用トークン）
+CREATE TABLE IF NOT EXISTS guest_links (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    token text NOT NULL UNIQUE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    expires_at timestamptz NOT NULL,
+    revoked_at timestamptz
+);
+
+CREATE INDEX IF NOT EXISTS idx_guest_links_token ON guest_links (token);

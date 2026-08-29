@@ -258,7 +258,7 @@
   .lightbox-prev { left: 8px; }
   .lightbox-next { right: 8px; }
 
-  /* Admin-token gate: covers the whole app until a valid token is supplied,
+  /* Access-token gate: covers the whole app until a valid token is supplied,
      so memo content never renders (and its API calls never fire) for
      anyone without the token. */
   .auth-gate {
@@ -277,12 +277,38 @@
   .auth-gate-error { font-size: 0.8rem; color: var(--danger); min-height: 1em; }
   body.auth-locked .app,
   body.auth-locked .vitals-section { display: none; }
+
+  /* Guest links dialog (admin-only: issue/list/revoke time-limited read-only URLs) */
+  #guestLinksBtn { display: none; } /* shown only once auth-check reports role=admin */
+  .guest-links-dialog {
+    width: min(560px, 92vw);
+    max-height: 84vh;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    background: var(--card-bg);
+    color: var(--text);
+  }
+  .guest-links-dialog[open] { display: flex; flex-direction: column; gap: 14px; }
+  .guest-links-dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
+  .guest-links-head { display: flex; justify-content: space-between; align-items: center; }
+  .guest-links-issue-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .guest-links-issue-row select { flex: 0 0 auto; }
+  .guest-link-result { display: none; flex-direction: column; gap: 6px; }
+  .guest-link-result.visible { display: flex; }
+  .guest-link-result input[type=text] { width: 100%; }
+  .guest-links-list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
+  .guest-link-row { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; padding: 6px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-soft); }
+  .guest-link-row.inactive { opacity: 0.55; }
+  .guest-link-token { font-family: monospace; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .guest-link-expiry { flex-shrink: 0; color: var(--text-dim); }
+  .guest-link-empty { font-size: 0.82rem; color: var(--text-dim); padding: 8px 4px; }
 </style>
 </head>
 <body class="view-mode auth-locked">
 <div class="auth-gate" id="authGate">
   <form class="card auth-gate-card" id="authGateForm">
-    <h2>🔒 管理者トークンが必要です</h2>
+    <h2>🔒 アクセストークンが必要です</h2>
     <input type="password" id="authTokenInput" placeholder="トークンを入力" autocomplete="current-password">
     <button type="submit" class="btn">開く</button>
     <div class="auth-gate-error" id="authGateError"></div>
@@ -291,6 +317,7 @@
 <header>
   <h1>📋 通院メモ</h1>
   <div class="header-right">
+    <button type="button" class="nav-link ui-fade" id="guestLinksBtn">🔗 一時URL発行</button>
     <button type="button" class="nav-link ui-fade" id="modeToggleBtn">✏️ 編集モードに切替</button>
     <span id="statusBadge" class="ui-fade"></span>
   </div>
@@ -399,6 +426,28 @@
   </div>
 </dialog>
 
+<dialog id="guestLinksDialog" class="guest-links-dialog">
+  <div class="guest-links-head">
+    <h2 style="margin:0;">🔗 一時URL（ゲスト閲覧用）</h2>
+    <button type="button" class="btn secondary" id="guestLinksCloseBtn">閉じる</button>
+  </div>
+  <div class="guest-links-issue-row">
+    <select id="guestLinkHours">
+      <option value="1">1時間</option>
+      <option value="24" selected>24時間</option>
+      <option value="72">3日</option>
+      <option value="168">7日</option>
+      <option value="720">30日</option>
+    </select>
+    <button type="button" class="btn" id="guestLinkCreateBtn">発行</button>
+  </div>
+  <div class="guest-link-result" id="guestLinkResult">
+    <input type="text" id="guestLinkResultUrl" readonly>
+    <button type="button" class="btn secondary" id="guestLinkCopyBtn">URLをコピー</button>
+  </div>
+  <div class="guest-links-list" id="guestLinksList"></div>
+</dialog>
+
 <footer>通院メモ &middot; データは Neon PostgreSQL に保存されます</footer>
 
 <script src="{{ url_for('static', filename='idle-ui.js') }}"></script>
@@ -424,6 +473,7 @@ const state = {
   vitalsMode: 'recent',
   currentMemoId: null,
   searchQuery: '',
+  role: null, // 'admin' | 'guest', set once the access token is verified
 };
 
 let vitalsChart;
@@ -443,38 +493,81 @@ function firstLine(content) {
 }
 
 // ---------------------------------------------------------------------
-// Admin-token gate: nothing under /api/* is reachable without this token
+// Access-token gate: nothing under /api/* is reachable without a token
 // (server-enforced in app.py), so the app is kept hidden client-side too
-// until a valid one is on hand.
+// until a valid one is on hand. Two kinds of token exist:
+// - the admin's own ADMIN_TOKEN: full read/write, can issue guest links
+// - a guest link's token (from a ?guest=... URL an admin shared): read-only,
+//   locked into view mode, until the link expires or is revoked
 // ---------------------------------------------------------------------
 
-function getToken() { return localStorage.getItem('adminToken') || ''; }
-function setToken(t) { localStorage.setItem('adminToken', t); }
+function getToken() { return localStorage.getItem('accessToken') || ''; }
+function setToken(t) { localStorage.setItem('accessToken', t); }
 
 function authHeaders(extra) {
   const headers = { ...(extra || {}) };
   const token = getToken();
-  if (token) headers['X-Admin-Token'] = token;
+  if (token) headers['X-Access-Token'] = token;
   return headers;
 }
 
-function unlockApp() {
+function applyRoleToUI(role) {
+  state.role = role;
+  if (role === 'guest') {
+    // Guests only ever see the read-only doctor-facing view; hide anything
+    // that lets them switch to (or reach) the editing UI.
+    document.body.classList.add('view-mode');
+    document.getElementById('modeToggleBtn').style.display = 'none';
+    document.getElementById('guestLinksBtn').style.display = 'none';
+  } else if (role === 'admin') {
+    document.getElementById('modeToggleBtn').style.display = '';
+    document.getElementById('guestLinksBtn').style.display = '';
+  }
+}
+
+function unlockApp(role) {
+  applyRoleToUI(role);
   document.body.classList.remove('auth-locked');
   document.getElementById('authGate').hidden = true;
 }
 
+// A guest opens a URL like https://.../?guest=<token>; adopt that token as
+// this device's stored access token (once) and scrub it from the address
+// bar so it doesn't linger in history/screenshots.
+function consumeGuestUrlToken() {
+  const url = new URL(window.location.href);
+  const guestToken = url.searchParams.get('guest');
+  if (!guestToken) return null;
+  url.searchParams.delete('guest');
+  window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+  return guestToken;
+}
+
 async function tryUnlockWithStoredToken() {
+  const guestToken = consumeGuestUrlToken();
+  if (guestToken) setToken(guestToken);
+
   if (!getToken()) return false;
   try {
     const res = await fetch('/api/auth/check', { headers: authHeaders() });
     if (res.ok) {
-      unlockApp();
+      const body = await res.json();
+      unlockApp(body.role);
       return true;
+    }
+    if (res.status === 401) {
+      // A stored (or ?guest=... supplied) token that the server no longer
+      // accepts - most likely a revoked/expired guest link. Drop it instead
+      // of getting stuck retrying it silently on every load.
+      localStorage.removeItem('accessToken');
+      if (guestToken) {
+        document.getElementById('authGateError').textContent = 'この一時URLは期限切れか無効になっています。';
+      }
     }
   } catch (e) {
     // offline with a previously-verified token: let the app's own
     // offline/cache handling take over rather than blocking on the gate
-    unlockApp();
+    unlockApp(state.role);
     return true;
   }
   return false;
@@ -489,17 +582,119 @@ document.getElementById('authGateForm').addEventListener('submit', async (e) => 
 
   errorEl.textContent = '';
   try {
-    const res = await fetch('/api/auth/check', { headers: { 'X-Admin-Token': token } });
+    const res = await fetch('/api/auth/check', { headers: { 'X-Access-Token': token } });
     if (!res.ok) {
       errorEl.textContent = res.status === 401 ? 'トークンが正しくありません' : `サーバーエラー (${res.status})`;
       return;
     }
+    const body = await res.json();
     setToken(token);
-    unlockApp();
+    unlockApp(body.role);
     startApp();
   } catch (e) {
     errorEl.textContent = '通信に失敗しました';
   }
+});
+
+// ---------------------------------------------------------------------
+// Guest links (admin-only): issue/list/revoke time-limited read-only URLs
+// ---------------------------------------------------------------------
+
+function formatGuestLinkTime(iso) {
+  const d = new Date(iso);
+  return `${fmtDate(d)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+async function loadGuestLinks() {
+  const listEl = document.getElementById('guestLinksList');
+  listEl.innerHTML = '<div class="guest-link-empty">読み込み中…</div>';
+  let links;
+  try {
+    links = await apiGet('/api/guest-links');
+  } catch (e) {
+    listEl.innerHTML = '<div class="guest-link-empty">一覧の取得に失敗しました。</div>';
+    return;
+  }
+
+  if (!links.length) {
+    listEl.innerHTML = '<div class="guest-link-empty">発行済みの一時URLはありません。</div>';
+    return;
+  }
+
+  listEl.innerHTML = '';
+  links.forEach(link => {
+    const inactive = link.revoked || link.expired;
+    const row = document.createElement('div');
+    row.className = 'guest-link-row' + (inactive ? ' inactive' : '');
+
+    const tokenSpan = document.createElement('span');
+    tokenSpan.className = 'guest-link-token';
+    tokenSpan.textContent = `…${link.token.slice(-8)}`;
+    row.appendChild(tokenSpan);
+
+    const expirySpan = document.createElement('span');
+    expirySpan.className = 'guest-link-expiry';
+    expirySpan.textContent = link.revoked
+      ? '失効済み'
+      : link.expired
+      ? '期限切れ'
+      : `〜${formatGuestLinkTime(link.expires_at)}`;
+    row.appendChild(expirySpan);
+
+    if (!inactive) {
+      const revokeBtn = document.createElement('button');
+      revokeBtn.type = 'button';
+      revokeBtn.className = 'btn secondary';
+      revokeBtn.textContent = '失効';
+      revokeBtn.addEventListener('click', async () => {
+        revokeBtn.disabled = true;
+        try {
+          await fetch(`/api/guest-links/${link.id}`, { method: 'DELETE', headers: authHeaders() });
+        } catch (e) { /* ignore, list refresh below will reflect actual state */ }
+        loadGuestLinks();
+      });
+      row.appendChild(revokeBtn);
+    }
+
+    listEl.appendChild(row);
+  });
+}
+
+document.getElementById('guestLinksBtn').addEventListener('click', () => {
+  document.getElementById('guestLinkResult').classList.remove('visible');
+  document.getElementById('guestLinksDialog').showModal();
+  loadGuestLinks();
+});
+document.getElementById('guestLinksCloseBtn').addEventListener('click', () => {
+  document.getElementById('guestLinksDialog').close();
+});
+
+document.getElementById('guestLinkCreateBtn').addEventListener('click', async () => {
+  const hours = Number(document.getElementById('guestLinkHours').value);
+  const btn = document.getElementById('guestLinkCreateBtn');
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/guest-links', {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ hours }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const link = await res.json();
+    const url = `${location.origin}/?guest=${encodeURIComponent(link.token)}`;
+    const urlInput = document.getElementById('guestLinkResultUrl');
+    urlInput.value = url;
+    document.getElementById('guestLinkResult').classList.add('visible');
+    urlInput.select();
+    loadGuestLinks();
+  } catch (e) {
+    alert('発行に失敗しました: ' + e.message);
+  }
+  btn.disabled = false;
+});
+
+document.getElementById('guestLinkCopyBtn').addEventListener('click', function () {
+  copyToClipboard(document.getElementById('guestLinkResultUrl').value, this);
 });
 
 // ---------------------------------------------------------------------
