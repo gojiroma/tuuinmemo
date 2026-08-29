@@ -1,8 +1,10 @@
 import csv
+import hmac
 import io
 import os
 import re
 from datetime import date, datetime, timedelta, timezone
+from functools import wraps
 
 import psycopg2
 import psycopg2.extras
@@ -11,6 +13,23 @@ from flask import Flask, jsonify, redirect, request, render_template, send_from_
 app = Flask(__name__)
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
+ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN")
+
+
+def require_admin_token(view):
+    # Gates the memo/vitals content behind a shared secret so the (unauthenticated,
+    # private-URL) app doesn't expose content to anyone who merely has the link.
+    # The token travels as the X-Admin-Token header, or ?token= for the CSV
+    # import form/file download style requests that can't set headers.
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not ADMIN_TOKEN:
+            return jsonify({"error": "server not configured: ADMIN_TOKEN is not set"}), 503
+        supplied = request.headers.get("X-Admin-Token") or request.args.get("token") or ""
+        if not hmac.compare_digest(supplied, ADMIN_TOKEN):
+            return jsonify({"error": "admin token required"}), 401
+        return view(*args, **kwargs)
+    return wrapped
 
 
 def get_conn():
@@ -74,7 +93,14 @@ def row_to_memo(row):
 # Memo endpoints
 # ---------------------------------------------------------------------------
 
+@app.route("/api/auth/check", methods=["GET"])
+@require_admin_token
+def auth_check():
+    return jsonify({"ok": True})
+
+
 @app.route("/api/memo", methods=["GET"])
+@require_admin_token
 def list_memos():
     qdate = request.args.get("date")
     limit = min(int(request.args.get("limit", 200)), 5000)
@@ -94,6 +120,7 @@ HISTORY_MIN_INTERVAL_SECONDS = 600  # only checkpoint a version if this much tim
 
 
 @app.route("/api/memo", methods=["POST"])
+@require_admin_token
 def upsert_memo():
     data = request.get_json(force=True, silent=True) or {}
     memo_date = data.get("date")
@@ -151,6 +178,7 @@ def upsert_memo():
 
 
 @app.route("/api/memo/<memo_id>/history", methods=["GET"])
+@require_admin_token
 def get_memo_history(memo_id):
     limit = min(int(request.args.get("limit", 50)), 200)
     with get_conn() as conn:
@@ -181,6 +209,7 @@ def get_memo_history(memo_id):
 
 
 @app.route("/api/memo/<memo_id>", methods=["GET"])
+@require_admin_token
 def get_memo(memo_id):
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -193,6 +222,7 @@ def get_memo(memo_id):
 
 
 @app.route("/api/memo/<memo_id>", methods=["PUT"])
+@require_admin_token
 def update_memo(memo_id):
     data = request.get_json(force=True, silent=True) or {}
 
@@ -229,6 +259,7 @@ def update_memo(memo_id):
 
 
 @app.route("/api/memo/<memo_id>", methods=["DELETE"])
+@require_admin_token
 def delete_memo(memo_id):
     with get_conn() as conn:
         with conn.cursor() as cur:
@@ -247,6 +278,7 @@ def delete_memo(memo_id):
 # ---------------------------------------------------------------------------
 
 @app.route("/api/search-history", methods=["GET"])
+@require_admin_token
 def list_search_history():
     limit = min(int(request.args.get("limit", 20)), 100)
     with get_conn() as conn:
@@ -261,6 +293,7 @@ def list_search_history():
 
 
 @app.route("/api/search-history", methods=["POST"])
+@require_admin_token
 def save_search_history():
     data = request.get_json(force=True, silent=True) or {}
     query = (data.get("query") or "").strip()
@@ -286,6 +319,7 @@ def save_search_history():
 # ---------------------------------------------------------------------------
 
 @app.route("/api/vitals", methods=["GET"])
+@require_admin_token
 def get_vitals():
     end = request.args.get("end") or date.today().isoformat()
     start = request.args.get("start") or (date.fromisoformat(end) - timedelta(days=49)).isoformat()
@@ -337,6 +371,7 @@ def parse_date_cell(value):
 
 
 @app.route("/api/vitals/import-csv", methods=["POST"])
+@require_admin_token
 def import_vitals_csv():
     data_type = request.form.get("type") or request.args.get("type")
     if data_type not in ("sleep", "steps"):

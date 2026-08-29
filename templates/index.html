@@ -257,9 +257,37 @@
   .lightbox-nav:hover { background: rgba(0, 0, 0, 0.65); }
   .lightbox-prev { left: 8px; }
   .lightbox-next { right: 8px; }
+
+  /* Admin-token gate: covers the whole app until a valid token is supplied,
+     so memo content never renders (and its API calls never fire) for
+     anyone without the token. */
+  .auth-gate {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+  }
+  .auth-gate[hidden] { display: none; }
+  .auth-gate-card { width: min(360px, 90vw); display: flex; flex-direction: column; gap: 12px; }
+  .auth-gate-card h2 { margin: 0; font-size: 1.05rem; }
+  .auth-gate-card input[type=password] { width: 100%; }
+  .auth-gate-error { font-size: 0.8rem; color: var(--danger); min-height: 1em; }
+  body.auth-locked .app,
+  body.auth-locked .vitals-section { display: none; }
 </style>
 </head>
-<body class="view-mode">
+<body class="view-mode auth-locked">
+<div class="auth-gate" id="authGate">
+  <form class="card auth-gate-card" id="authGateForm">
+    <h2>🔒 管理者トークンが必要です</h2>
+    <input type="password" id="authTokenInput" placeholder="トークンを入力" autocomplete="current-password">
+    <button type="submit" class="btn">開く</button>
+    <div class="auth-gate-error" id="authGateError"></div>
+  </form>
+</div>
 <header>
   <h1>📋 通院メモ</h1>
   <div class="header-right">
@@ -415,11 +443,71 @@ function firstLine(content) {
 }
 
 // ---------------------------------------------------------------------
+// Admin-token gate: nothing under /api/* is reachable without this token
+// (server-enforced in app.py), so the app is kept hidden client-side too
+// until a valid one is on hand.
+// ---------------------------------------------------------------------
+
+function getToken() { return localStorage.getItem('adminToken') || ''; }
+function setToken(t) { localStorage.setItem('adminToken', t); }
+
+function authHeaders(extra) {
+  const headers = { ...(extra || {}) };
+  const token = getToken();
+  if (token) headers['X-Admin-Token'] = token;
+  return headers;
+}
+
+function unlockApp() {
+  document.body.classList.remove('auth-locked');
+  document.getElementById('authGate').hidden = true;
+}
+
+async function tryUnlockWithStoredToken() {
+  if (!getToken()) return false;
+  try {
+    const res = await fetch('/api/auth/check', { headers: authHeaders() });
+    if (res.ok) {
+      unlockApp();
+      return true;
+    }
+  } catch (e) {
+    // offline with a previously-verified token: let the app's own
+    // offline/cache handling take over rather than blocking on the gate
+    unlockApp();
+    return true;
+  }
+  return false;
+}
+
+document.getElementById('authGateForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const input = document.getElementById('authTokenInput');
+  const errorEl = document.getElementById('authGateError');
+  const token = input.value.trim();
+  if (!token) return;
+
+  errorEl.textContent = '';
+  try {
+    const res = await fetch('/api/auth/check', { headers: { 'X-Admin-Token': token } });
+    if (!res.ok) {
+      errorEl.textContent = res.status === 401 ? 'トークンが正しくありません' : `サーバーエラー (${res.status})`;
+      return;
+    }
+    setToken(token);
+    unlockApp();
+    startApp();
+  } catch (e) {
+    errorEl.textContent = '通信に失敗しました';
+  }
+});
+
+// ---------------------------------------------------------------------
 // Networking + offline cache
 // ---------------------------------------------------------------------
 
 async function apiGet(url) {
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: authHeaders() });
   if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
   return res.json();
 }
@@ -479,7 +567,7 @@ async function syncPendingDrafts() {
     try {
       const res = await fetch('/api/memo', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           date: dateStr,
           summary: draft.summary,
@@ -646,7 +734,7 @@ async function loadSearchHistory() {
 function saveSearchHistory(query) {
   fetch('/api/search-history', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ query }),
   }).then(loadSearchHistory).catch(() => {});
 }
@@ -791,7 +879,7 @@ async function autosaveNow() {
   try {
     const res = await fetch('/api/memo', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ date: dateStr, ...payload }),
     });
     if (!res.ok) throw new Error(await res.text());
@@ -839,7 +927,7 @@ async function deleteEntry(dateStr) {
   const memo = state.entriesByDate[dateStr];
   if (memo) {
     try {
-      await fetch(`/api/memo/${memo.id}`, { method: 'DELETE' });
+      await fetch(`/api/memo/${memo.id}`, { method: 'DELETE', headers: authHeaders() });
     } catch (e) {
       setSaveStatus('オフラインのため削除できませんでした', 'offline');
       return;
@@ -1108,7 +1196,7 @@ async function importCsv(inputEl, type) {
   form.append('file', file);
   form.append('type', type);
   try {
-    const res = await fetch('/api/vitals/import-csv', { method: 'POST', body: form });
+    const res = await fetch('/api/vitals/import-csv', { method: 'POST', headers: authHeaders(), body: form });
     const result = await res.json();
     if (!res.ok) throw new Error(result.error || 'import failed');
     alert(`${result.imported}件インポートしました（既存の日付は上書き。形式エラーで${result.skipped}件スキップ）`);
@@ -1154,23 +1242,33 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-document.querySelector('.period-toggle [data-mode="recent"]').classList.add('active');
-document.getElementById('jumpDateInput').value = state.selectedDate;
-setStatus(navigator.onLine ? 'オンライン' : 'オフライン', !navigator.onLine);
+function startApp() {
+  document.querySelector('.period-toggle [data-mode="recent"]').classList.add('active');
+  document.getElementById('jumpDateInput').value = state.selectedDate;
+  setStatus(navigator.onLine ? 'オンライン' : 'オフライン', !navigator.onLine);
 
-loadEntries().then(() => {
-  // Land on the latest entry rather than today's (likely blank) date, since
-  // the page always opens in view mode first.
-  if (state.entries.length) {
-    state.selectedDate = state.entries[0].date;
-    document.getElementById('jumpDateInput').value = state.selectedDate;
+  loadEntries().then(() => {
+    // Land on the latest entry rather than today's (likely blank) date, since
+    // the page always opens in view mode first.
+    if (state.entries.length) {
+      state.selectedDate = state.entries[0].date;
+      document.getElementById('jumpDateInput').value = state.selectedDate;
+    }
+    renderEntryList();
+    loadEditorForSelectedDate();
+    if (navigator.onLine) syncPendingDrafts();
+  });
+  loadVitals();
+  loadSearchHistory();
+}
+
+tryUnlockWithStoredToken().then(unlocked => {
+  if (unlocked) {
+    startApp();
+  } else {
+    document.getElementById('authTokenInput').focus();
   }
-  renderEntryList();
-  loadEditorForSelectedDate();
-  if (navigator.onLine) syncPendingDrafts();
 });
-loadVitals();
-loadSearchHistory();
 </script>
 </body>
 </html>
