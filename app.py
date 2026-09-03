@@ -508,16 +508,17 @@ def import_vitals_csv():
             "found_columns": reader.fieldnames,
         }), 400
 
-    rows = []
+    by_date = {}
     errors = []
     for i, r in enumerate(reader, start=2):
         try:
             d = parse_date_cell(r[date_key])
             v = int(re.sub(r"[^\d-]", "", r[value_key]))
-            rows.append((d, v))
+            by_date[d] = v  # a day can have multiple source rows (e.g. naps); last one wins
         except (ValueError, KeyError, TypeError) as e:
             errors.append(f"row {i}: {e}")
 
+    rows = list(by_date.items())
     if not rows:
         return jsonify({"error": "no valid rows", "details": errors}), 400
 
