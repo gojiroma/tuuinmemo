@@ -447,6 +447,123 @@ def get_vitals():
     })
 
 
+# --- manual entries UI + API (追加) ---
+
+@app.route("/manual")
+@require_access(admin_only=True)
+def manual_page():
+    return render_template("manual_entries.html")
+
+@app.route("/api/manual/steps", methods=["POST"])
+@require_access(admin_only=True)
+def manual_steps():
+    data = request.get_json(force=True, silent=True) or {}
+    entries = data.get("entries", [])
+    if not isinstance(entries, list) or not entries:
+        return jsonify({"error": "entries must be a non-empty list"}), 400
+
+    rows = []
+    errors = []
+    for i, e in enumerate(entries):
+        d = e.get("date")
+        try:
+            # validate date
+            date.fromisoformat(d)
+        except Exception:
+            errors.append({"index": i, "error": "invalid date", "date": d})
+            continue
+        try:
+            steps = int(e.get("steps") or 0)
+            if steps < 0:
+                raise ValueError()
+        except Exception:
+            errors.append({"index": i, "error": "invalid steps", "steps": e.get("steps")})
+            continue
+        rows.append((d, steps))
+
+    if not rows:
+        return jsonify({"ok": False, "errors": errors}), 400
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            psycopg2.extras.execute_values(
+                cur,
+                """
+                INSERT INTO steps_data (date, steps) VALUES %s
+                ON CONFLICT (date) DO UPDATE SET steps = EXCLUDED.steps
+                """,
+                rows,
+            )
+        conn.commit()
+    return jsonify({"ok": True, "imported": len(rows), "errors": errors, "message": "歩数データを保存しました"})
+
+@app.route("/api/manual/sleep", methods=["POST"])
+@require_access(admin_only=True)
+def manual_sleep():
+    data = request.get_json(force=True, silent=True) or {}
+    entries = data.get("entries", [])
+    if not isinstance(entries, list) or not entries:
+        return jsonify({"error": "entries must be a non-empty list"}), 400
+
+    rows_duration = []  # date, duration
+    rows_score = []     # date, score
+    errors = []
+    for i, e in enumerate(entries):
+        d = e.get("date")
+        try:
+            date.fromisoformat(d)
+        except Exception:
+            errors.append({"index": i, "error": "invalid date", "date": d})
+            continue
+        duration = e.get("duration")
+        score = e.get("score")
+        used = False
+        if duration not in (None, ''):
+            try:
+                dur = int(duration)
+                rows_duration.append((d, dur))
+                used = True
+            except Exception:
+                errors.append({"index": i, "error": "invalid duration", "duration": duration})
+                continue
+        if score not in (None, ''):
+            try:
+                sc = int(score)
+                rows_score.append((d, sc))
+                used = True
+            except Exception:
+                errors.append({"index": i, "error": "invalid score", "score": score})
+                continue
+        if not used:
+            errors.append({"index": i, "error": "no duration or score provided"})
+    if not rows_duration and not rows_score:
+        return jsonify({"ok": False, "errors": errors}), 400
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            if rows_duration:
+                psycopg2.extras.execute_values(
+                    cur,
+                    """
+                    INSERT INTO sleep_data (date, duration) VALUES %s
+                    ON CONFLICT (date) DO UPDATE SET duration = EXCLUDED.duration
+                    """,
+                    rows_duration,
+                )
+            if rows_score:
+                psycopg2.extras.execute_values(
+                    cur,
+                    """
+                    INSERT INTO sleep_data (date, score) VALUES %s
+                    ON CONFLICT (date) DO UPDATE SET score = EXCLUDED.score
+                    """,
+                    rows_score,
+                )
+        conn.commit()
+    return jsonify({"ok": True, "imported_duration": len(rows_duration), "imported_score": len(rows_score), "errors": errors, "message": "睡眠データを保存しました"})
+
+# ---------------------------------------------------------------------------
+# DATE_KEYS = ("date", "day", "timestamp", "日付")
 DATE_KEYS = ("date", "day", "timestamp", "日付")
 SCORE_KEYS = ("overall_score", "sleep_score", "score", "スコア")
 DURATION_KEYS = ("duration", "minutes", "sleep", "分", "睡眠時間")
