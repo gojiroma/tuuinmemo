@@ -86,7 +86,7 @@ body {
 
 /* ---------------------------------------------------------------------
    Header
---------------------------------------------------------------------- */
+---------------------------------------------------------------------- */
 
 header {
   display: flex;
@@ -129,7 +129,7 @@ header .nav-link:hover { background: var(--accent-dim); }
 
 /* ---------------------------------------------------------------------
    Cards + buttons (shared vocabulary)
---------------------------------------------------------------------- */
+---------------------------------------------------------------------- */
 
 .card {
   background: var(--card-bg);
@@ -191,7 +191,7 @@ input[type=text]:focus, input[type=date]:focus, input[type=search]:focus, textar
    Idle chrome: after a few seconds of no input, secondary controls
    recede so the content itself has the floor. Never fully invisible,
    so touch users without hover can still find + tap them.
---------------------------------------------------------------------- */
+---------------------------------------------------------------------- */
 
 .ui-fade { transition: opacity var(--t); }
 body.ui-idle .ui-fade { opacity: 0.4; }
@@ -213,3 +213,23 @@ footer a { color: var(--text-faint); }
 
 .hint { font-size: 0.75rem; color: var(--text-faint); margin-top: 6px; }
 .empty-hint { color: var(--text-dim); font-size: 0.85rem; padding: 10px 0; }
+
+/* Keep the memo workspace above the optional analytics panel.  The
+   templates contain the chart before the workspace so the chart can be
+   initialized early, but visual order should prioritize the latest memo.
+   This applies to both edit mode and the read-only guest view. */
+body {
+  display: flex;
+  flex-direction: column;
+}
+body > header { order: 0; }
+body > .app { order: 1; }
+body > .vitals-section { order: 2; }
+body > footer { order: 3; }
+body > .app,
+body > .vitals-section { width: 100%; }
+
+@media (max-width: 860px) {
+  body > .app { padding-top: 12px; }
+  body > .vitals-section { padding-top: 8px; }
+}
