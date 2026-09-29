@@ -74,11 +74,6 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* The custom font reads thin at regular weight — force everything bold,
-   overriding the individual weight rules sprinkled through this file. */
-* {
-  font-weight: 700 !important;
-}
 
 ::selection { background: var(--accent-soft); }
 
