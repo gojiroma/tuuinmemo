@@ -69,7 +69,7 @@ html, body {
 
 body {
   margin: 0;
-  font-family: "Gojiro Manus", -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+  font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
 }
