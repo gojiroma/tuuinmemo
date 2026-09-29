@@ -225,21 +225,26 @@
 
   /* Image lightbox (click a preview image to view it full-size) ---- */
   .lightbox-dialog {
-    width: min(920px, 95vw);
-    max-height: 92vh;
+    box-sizing: border-box;
+    width: calc(100vw - 24px);
+    height: calc(100vh - 24px);
+    height: calc(100dvh - 24px);
+    max-width: none;
+    max-height: none;
     border: none;
     border-radius: var(--radius);
     padding: 0;
     background: #14161a;
     color: #fff;
   }
+  .lightbox-dialog[open] { display: flex; flex-direction: column; }
   .lightbox-dialog::backdrop { background: rgba(0, 0, 0, 0.75); }
   .lightbox-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; }
   .lightbox-toolbar .btn.secondary { color: #fff; border-color: rgba(255, 255, 255, 0.5); }
   .lightbox-toolbar .btn.secondary:hover { background: rgba(255, 255, 255, 0.15); }
   .lightbox-counter { font-size: 0.8rem; color: rgba(255, 255, 255, 0.75); }
-  .lightbox-body { position: relative; display: flex; align-items: center; justify-content: center; min-height: 200px; max-height: 80vh; }
-  .lightbox-body img { max-width: 100%; max-height: 80vh; object-fit: contain; }
+  .lightbox-body { position: relative; display: flex; flex: 1; align-items: center; justify-content: center; min-height: 0; }
+  .lightbox-body img { max-width: 100%; max-height: 100%; object-fit: contain; }
   .lightbox-nav {
     position: absolute;
     top: 50%;
