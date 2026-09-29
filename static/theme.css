@@ -1,8 +1,6 @@
 /* Shared design tokens + base chrome for 通院メモ (edit + view pages). */
 
 @font-face {
-  font-family: "Gojiro Manus";
-  src: url("/static/fonts/gojiromanus.otf") format("opentype");
   font-weight: normal;
   font-style: normal;
   font-display: swap;
