@@ -89,9 +89,15 @@
 
   /* Editor card --------------------------------------------------- */
   .editor-card { display: flex; flex-direction: column; gap: 12px; }
-  .editor-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .editor-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .date-label-group { display: flex; align-items: baseline; gap: 8px; }
   .selected-date-label { font-weight: 700; font-size: 1.1rem; }
   .selected-date-weekday { font-size: 0.85rem; color: var(--text-dim); }
+  .copy-btn { display: none; font-size: 0.78rem; padding: 5px 12px; opacity: 0.5; transition: opacity var(--t-fast); animation: pulse 2s infinite; }
+  .copy-btn:hover { opacity: 1; animation: none; }
+  body:not(.view-mode) .copy-btn { display: inline-block; }
+  body.view-mode .copy-btn { display: inline-block; }
+  @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
 
   .editor-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; }
   .editor-toolbar .group { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -151,7 +157,7 @@
   #saveStatus.saved { color: var(--success); }
   #saveStatus.pending { color: var(--text-dim); }
   #saveStatus.offline { color: var(--danger); }
-  .copy-btn { display: none; font-size: 0.78rem; padding: 5px 12px; }
+
 
   /* View mode: doctor-facing read-only view of the same page, toggled
      in place instead of navigating to a separate page/URL. */
@@ -374,8 +380,11 @@
 
   <div class="card editor-card" id="editorCard">
     <div class="editor-head">
-      <span class="selected-date-label" id="selectedDateLabel"></span>
-      <span class="selected-date-weekday" id="selectedDateWeekday"></span>
+      <div class="date-label-group">
+        <span class="selected-date-label" id="selectedDateLabel"></span>
+        <span class="selected-date-weekday" id="selectedDateWeekday"></span>
+      </div>
+      <button class="btn secondary copy-btn" id="copyBtn">メモをコピー</button>
     </div>
 
     <div class="editor-toolbar">
@@ -390,7 +399,6 @@
       <div id="contentView"></div>
     </div>
     <div class="status-row">
-      <button class="btn secondary copy-btn" id="copyBtn">メモをコピー</button>
       <span id="saveStatus"></span>
     </div>
   </div>
@@ -1430,6 +1438,11 @@ const modeToggleBtn = document.getElementById('modeToggleBtn');
 modeToggleBtn.addEventListener('click', () => {
   const viewMode = document.body.classList.toggle('view-mode');
   modeToggleBtn.textContent = viewMode ? '✏️ 編集モードに切替' : '🩺 閲覧モードに切替';
+  if (!viewMode) {
+    document.getElementById('jumpDateInput').value = VitalsChart.fmtDate(new Date());
+    state.selectedDate = document.getElementById('jumpDateInput').value;
+    loadEditorForSelectedDate();
+  }
 });
 
 // ---------------------------------------------------------------------
