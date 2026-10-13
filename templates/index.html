@@ -315,6 +315,7 @@
   .guest-link-expiry { flex-shrink: 0; color: var(--text-dim); }
   .guest-link-empty { font-size: 0.82rem; color: var(--text-dim); padding: 8px 4px; }
 </style>
+<link rel="stylesheet" href="{{ url_for('static', filename='float.css') }}">
 </head>
 <body class="view-mode auth-locked">
 <div class="auth-gate" id="authGate">
@@ -328,8 +329,9 @@
 <header>
   <h1>📋 通院メモ</h1>
   <div class="header-right">
-    <button type="button" class="nav-link ui-fade" id="guestLinksBtn">🔗 一時URL発行</button>
-    <button type="button" class="nav-link ui-fade" id="modeToggleBtn">✏️ 編集モードに切替</button>
+    <button type="button" class="nav-link ui-fade" id="vitalsToggleBtn" aria-label="グラフ">📊</button>
+    <button type="button" class="nav-link ui-fade" id="guestLinksBtn">🔗 一時URL</button>
+    <button type="button" class="nav-link ui-fade" id="modeToggleBtn">✏️ 編集</button>
     <span id="statusBadge" class="ui-fade"></span>
   </div>
 </header>
@@ -402,6 +404,13 @@
       <span id="saveStatus"></span>
     </div>
   </div>
+  <nav class="pager" aria-label="エントリの切替">
+    <div class="pager-inner">
+      <button type="button" id="pagerPrev" aria-label="前（古い）のメモ">‹</button>
+      <span class="pager-count" id="pagerCount"></span>
+      <button type="button" id="pagerNext" aria-label="次（新しい）のメモ">›</button>
+    </div>
+  </nav>
 </div>
 
 <dialog id="historyDialog" class="history-dialog">
@@ -891,11 +900,18 @@ function selectDate(dateStr) {
     autosaveNow();
   }
 
+  const dir = dateStr > state.selectedDate ? 1 : -1; // newer enters from the right
   state.selectedDate = dateStr;
   document.getElementById('jumpDateInput').value = dateStr;
   renderEntryList();
   loadEditorForSelectedDate();
-  flashJumpHighlight();
+  const card = document.getElementById('editorCard');
+  if (card.animate && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    card.animate(
+      [{ opacity: 0, transform: `translateX(${dir * 48}px) scale(0.985)` }, { opacity: 1, transform: 'none' }],
+      { duration: 320, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
+    );
+  }
 }
 
 function loadEditorForSelectedDate() {
@@ -912,7 +928,78 @@ function loadEditorForSelectedDate() {
 
   setSaveStatus(draft ? '未同期の下書きがあります' : '', draft ? 'offline' : '');
   updatePreview();
+  updatePager();
 }
+
+// ---------------------------------------------------------------------
+// Page-turning: ←/→, swipe or the pager step through entries by date.
+// Works from the selected date, so an unsaved (new) date is a valid spot.
+// ---------------------------------------------------------------------
+
+function stepDate(dir) { // dir: -1 = older, +1 = newer
+  const dates = state.entries.map(m => m.date).sort();
+  const cur = state.selectedDate;
+  const next = dir > 0 ? dates.find(d => d > cur) : [...dates].reverse().find(d => d < cur);
+  return next || null;
+}
+
+function updatePager() {
+  const dates = state.entries.map(m => m.date).sort();
+  const idx = dates.indexOf(state.selectedDate);
+  document.getElementById('pagerCount').textContent =
+    dates.length ? `${idx >= 0 ? idx + 1 : '＋'} / ${dates.length}` : '';
+  document.getElementById('pagerPrev').disabled = !stepDate(-1);
+  document.getElementById('pagerNext').disabled = !stepDate(1);
+}
+
+function turnPage(dir) {
+  const d = stepDate(dir);
+  if (d) selectDate(d);
+}
+
+document.getElementById('pagerPrev').addEventListener('click', () => turnPage(-1));
+document.getElementById('pagerNext').addEventListener('click', () => turnPage(1));
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+  if (document.querySelector('dialog[open]') || document.body.classList.contains('show-vitals')) return;
+  const t = e.target;
+  const typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+  if (typing && !e.altKey) return; // plain arrows belong to the caret while typing
+  e.preventDefault();
+  turnPage(e.key === 'ArrowLeft' ? -1 : 1);
+});
+
+(() => {
+  const card = document.getElementById('editorCard');
+  let sx = 0, sy = 0, tracking = false;
+  card.addEventListener('touchstart', (e) => {
+    const t = e.target;
+    tracking = e.touches.length === 1 && !/^(TEXTAREA|INPUT|CANVAS)$/.test(t.tagName);
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+  }, { passive: true });
+  card.addEventListener('touchend', (e) => {
+    if (!tracking) return;
+    tracking = false;
+    const dx = e.changedTouches[0].clientX - sx;
+    const dy = e.changedTouches[0].clientY - sy;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) turnPage(dx > 0 ? -1 : 1);
+  }, { passive: true });
+})();
+
+// Vitals chart lives in a frosted overlay opened from the dock.
+function setVitalsOpen(open) {
+  document.body.classList.toggle('show-vitals', open);
+}
+document.getElementById('vitalsToggleBtn').addEventListener('click', () =>
+  setVitalsOpen(!document.body.classList.contains('show-vitals')));
+document.querySelector('.vitals-section').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) setVitalsOpen(false);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') setVitalsOpen(false);
+});
 
 document.getElementById('jumpBtn').addEventListener('click', () => {
   const v = document.getElementById('jumpDateInput').value;
@@ -1471,7 +1558,7 @@ document.getElementById('copyBtn').addEventListener('click', function () {
 const modeToggleBtn = document.getElementById('modeToggleBtn');
 modeToggleBtn.addEventListener('click', () => {
   const viewMode = document.body.classList.toggle('view-mode');
-  modeToggleBtn.textContent = viewMode ? '✏️ 編集モードに切替' : '🩺 閲覧モードに切替';
+  modeToggleBtn.textContent = viewMode ? '✏️ 編集' : '🩺 閲覧';
   if (!viewMode) {
     document.getElementById('jumpDateInput').value = VitalsChart.fmtDate(new Date());
     state.selectedDate = document.getElementById('jumpDateInput').value;
