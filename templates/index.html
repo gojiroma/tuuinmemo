@@ -403,6 +403,7 @@
     <div class="status-row">
       <span id="saveStatus"></span>
     </div>
+    <button type="button" class="reveal-cover" id="revealBtn">📋 メモをコピーして表示</button>
   </div>
   <nav class="pager" aria-label="エントリの切替">
     <div class="pager-inner">
@@ -929,7 +930,20 @@ function loadEditorForSelectedDate() {
   setSaveStatus(draft ? '未同期の下書きがあります' : '', draft ? 'offline' : '');
   updatePreview();
   updatePager();
+  setCovered(!!(base.content || '').trim());
 }
+
+// View mode keeps the memo blurred until it has been copied: the cover
+// button copies the text, then lifts the blur. Re-applied for every entry.
+function setCovered(on) {
+  document.getElementById('editorCard').classList.toggle('covered', on);
+}
+document.getElementById('revealBtn').addEventListener('click', () => {
+  const text = document.getElementById('contentEdit').value;
+  const reveal = () => setCovered(false);
+  // Reveal even if the clipboard is unavailable (insecure context, denied).
+  try { navigator.clipboard.writeText(text).then(reveal, reveal); } catch (e) { reveal(); }
+});
 
 // ---------------------------------------------------------------------
 // Page-turning: ←/→, swipe or the pager step through entries by date.
@@ -1560,6 +1574,7 @@ modeToggleBtn.addEventListener('click', () => {
   const viewMode = document.body.classList.toggle('view-mode');
   modeToggleBtn.textContent = viewMode ? '✏️' : '🩺';
   modeToggleBtn.title = modeToggleBtn.ariaLabel = viewMode ? '編集モードに切替' : '閲覧モードに切替';
+  if (viewMode) setCovered(!!document.getElementById('contentEdit').value.trim());
   if (!viewMode) {
     document.getElementById('jumpDateInput').value = VitalsChart.fmtDate(new Date());
     state.selectedDate = document.getElementById('jumpDateInput').value;
