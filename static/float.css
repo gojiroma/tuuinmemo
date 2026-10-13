@@ -72,7 +72,7 @@ header .header-right:hover { opacity: 1; }
 /* The sheet ----------------------------------------------------------- */
 body > .app {
   display: block;
-  padding: max(14px, env(safe-area-inset-top)) 16px 0;
+  padding: max(14px, env(safe-area-inset-top)) 72px 14px 16px; /* right gutter keeps the dock + pager clear of the sheet */
   max-width: none;
 }
 .left { display: none; }
@@ -82,7 +82,7 @@ body:not(.view-mode) .left { display: block; }
   position: relative;
   max-width: 820px;
   margin: 0 auto;
-  min-height: calc(100dvh - 92px - env(safe-area-inset-top));
+  min-height: calc(100dvh - 28px - env(safe-area-inset-top));
   padding: clamp(22px, 4vw, 44px);
   gap: 18px;
   border-radius: 28px;
@@ -126,28 +126,24 @@ body:not(.view-mode) #contentView {
 }
 .status-row { margin-top: auto; }
 
-/* Pager: ‹ 3 / 42 › under the sheet ------------------------------------ */
+/* Pager: ▴ 3 / 42 ▾ in a vertical pill above the dock (bottom-right) ---- */
 .pager {
-  position: sticky;
-  bottom: 0;
-  z-index: 30;
-  display: flex;
-  justify-content: center;
-  padding: 14px 0 max(14px, env(safe-area-inset-bottom));
-  pointer-events: none;
+  position: fixed;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 156px);
+  z-index: 40;
 }
 .pager-inner {
-  pointer-events: auto;
   display: flex;
+  flex-direction: column-reverse; /* older at the bottom, newer on top */
   align-items: center;
-  gap: 4px;
-  padding: 4px;
+  gap: 2px;
+  padding: 5px;
   border-radius: 999px;
   background: var(--glass);
   border: 1px solid var(--glass-edge);
   -webkit-backdrop-filter: blur(18px) saturate(1.4);
   backdrop-filter: blur(18px) saturate(1.4);
-  box-shadow: var(--shadow-md);
 }
 .pager button {
   width: 38px;
@@ -156,7 +152,7 @@ body:not(.view-mode) #contentView {
   border-radius: 999px;
   background: transparent;
   color: var(--accent);
-  font-size: 1.25rem;
+  font-size: 1rem;
   line-height: 1;
   cursor: pointer;
   transition: background var(--t-fast), opacity var(--t-fast);
@@ -164,12 +160,15 @@ body:not(.view-mode) #contentView {
 .pager button:hover:not(:disabled) { background: var(--accent-dim); }
 .pager button:disabled { opacity: 0.25; cursor: default; }
 .pager-count {
-  min-width: 5.2em;
+  width: 38px;
   text-align: center;
-  font-size: 0.8rem;
+  font-size: 0.68rem;
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
+  line-height: 1.2;
 }
+body.ui-idle .pager-inner { opacity: 0.35; }
+.pager-inner:hover { opacity: 1; }
 
 /* Edit-mode jump row floats as a small pill at the bottom-left --------- */
 body:not(.view-mode) .left {
@@ -231,3 +230,7 @@ body.auth-locked > .vitals-section { display: none; }
 }
 
 body > footer { display: none; }
+
+@media (min-width: 1000px) {
+  body > .app { padding-left: 72px; }
+}
