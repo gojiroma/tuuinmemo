@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tuuinmemo-shell-v4';
+const CACHE_NAME = 'tuuinmemo-shell-v5';
 const SHELL_FILES = [
   '/',
   '/static/manifest.json',
@@ -6,6 +6,7 @@ const SHELL_FILES = [
   '/static/icons/icon-512.png',
   '/static/icons/apple-touch-icon.png',
   '/static/theme.css',
+  '/static/float.css',
   '/static/idle-ui.js',
   '/static/vitals-chart.js',
   '/static/markdown-editor.js',
