@@ -329,9 +329,9 @@
 <header>
   <h1>📋 通院メモ</h1>
   <div class="header-right">
-    <button type="button" class="nav-link ui-fade" id="vitalsToggleBtn" aria-label="グラフ">📊</button>
-    <button type="button" class="nav-link ui-fade" id="guestLinksBtn">🔗 一時URL</button>
-    <button type="button" class="nav-link ui-fade" id="modeToggleBtn">✏️ 編集</button>
+    <button type="button" class="nav-link ui-fade" id="vitalsToggleBtn" aria-label="グラフ" title="グラフ">📊</button>
+    <button type="button" class="nav-link ui-fade" id="guestLinksBtn" aria-label="一時URL発行" title="一時URL発行">🔗</button>
+    <button type="button" class="nav-link ui-fade" id="modeToggleBtn" aria-label="編集モードに切替" title="編集モードに切替">✏️</button>
     <span id="statusBadge" class="ui-fade"></span>
   </div>
 </header>
@@ -1558,7 +1558,8 @@ document.getElementById('copyBtn').addEventListener('click', function () {
 const modeToggleBtn = document.getElementById('modeToggleBtn');
 modeToggleBtn.addEventListener('click', () => {
   const viewMode = document.body.classList.toggle('view-mode');
-  modeToggleBtn.textContent = viewMode ? '✏️ 編集' : '🩺 閲覧';
+  modeToggleBtn.textContent = viewMode ? '✏️' : '🩺';
+  modeToggleBtn.title = modeToggleBtn.ariaLabel = viewMode ? '編集モードに切替' : '閲覧モードに切替';
   if (!viewMode) {
     document.getElementById('jumpDateInput').value = VitalsChart.fmtDate(new Date());
     state.selectedDate = document.getElementById('jumpDateInput').value;
