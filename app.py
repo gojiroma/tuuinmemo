@@ -336,16 +336,19 @@ def list_guest_links():
 @require_access(admin_only=True)
 def create_guest_link():
     data = request.get_json(force=True, silent=True) or {}
+    # pending=True pre-creates a token that is not valid yet (already expired);
+    # activate_guest_link() starts its clock.
+    pending = bool(data.get("pending"))
     hours = data.get("hours", GUEST_LINK_DEFAULT_HOURS)
     try:
         hours = float(hours)
     except (TypeError, ValueError):
         return jsonify({"error": "hours must be a number"}), 400
-    if not (0 < hours <= GUEST_LINK_MAX_HOURS):
+    if not pending and not (0 < hours <= GUEST_LINK_MAX_HOURS):
         return jsonify({"error": f"hours must be between 0 and {GUEST_LINK_MAX_HOURS}"}), 400
 
     token = secrets.token_urlsafe(24)
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=hours)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=0 if pending else hours)
 
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -357,6 +360,25 @@ def create_guest_link():
         conn.commit()
 
     return jsonify(row_to_guest_link(row)), 201
+
+
+@app.route("/api/guest-links/<link_id>/activate", methods=["POST"])
+@require_access(admin_only=True)
+def activate_guest_link(link_id):
+    # Starts the 24h window now, for a link created ahead of time.
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=GUEST_LINK_DEFAULT_HOURS)
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "UPDATE guest_links SET expires_at = %s WHERE id = %s AND revoked_at IS NULL RETURNING *",
+                (expires_at, link_id),
+            )
+            row = cur.fetchone()
+        conn.commit()
+
+    if not row:
+        return jsonify({"error": "not found or revoked"}), 404
+    return jsonify(row_to_guest_link(row))
 
 
 @app.route("/api/guest-links/<link_id>", methods=["DELETE"])

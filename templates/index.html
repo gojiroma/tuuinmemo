@@ -176,7 +176,7 @@
   body.view-mode .copy-btn { display: inline-block; }
 
   /* Vitals section ------------------------------------------------ */
-  .vitals-section { padding: 16px; max-width: 1600px; margin: 0 auto; }
+  .vitals-section { padding: 0; }
   .vitals-card { max-width: none; }
   .vitals-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
   .chart-box { height: 440px; position: relative; }
@@ -289,31 +289,6 @@
   body.auth-locked .app,
   body.auth-locked .vitals-section { display: none; }
 
-  /* Guest links dialog (admin-only: issue/list/revoke time-limited read-only URLs) */
-  #guestLinksBtn { display: none; } /* shown only once auth-check reports role=admin */
-  .guest-links-dialog {
-    width: min(560px, 92vw);
-    max-height: 84vh;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
-    background: var(--card-bg);
-    color: var(--text);
-  }
-  .guest-links-dialog[open] { display: flex; flex-direction: column; gap: 14px; }
-  .guest-links-dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
-  .guest-links-head { display: flex; justify-content: space-between; align-items: center; }
-  .guest-links-issue-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  .guest-links-issue-row select { flex: 0 0 auto; }
-  .guest-link-result { display: none; flex-direction: column; gap: 6px; }
-  .guest-link-result.visible { display: flex; }
-  .guest-link-result input[type=text] { width: 100%; }
-  .guest-links-list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
-  .guest-link-row { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; padding: 6px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-soft); }
-  .guest-link-row.inactive { opacity: 0.55; }
-  .guest-link-token { font-family: monospace; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .guest-link-expiry { flex-shrink: 0; color: var(--text-dim); }
-  .guest-link-empty { font-size: 0.82rem; color: var(--text-dim); padding: 8px 4px; }
 </style>
 <link rel="stylesheet" href="{{ url_for('static', filename='float.css') }}">
 </head>
@@ -329,41 +304,9 @@
 <header>
   <h1>📋 通院メモ</h1>
   <div class="header-right">
-    <button type="button" class="nav-link ui-fade" id="vitalsToggleBtn" aria-label="グラフ" title="グラフ">📊</button>
-    <button type="button" class="nav-link ui-fade" id="guestLinksBtn" aria-label="一時URL発行" title="一時URL発行">🔗</button>
-    <button type="button" class="nav-link ui-fade" id="modeToggleBtn" aria-label="編集モードに切替" title="編集モードに切替">✏️</button>
     <span id="statusBadge" class="ui-fade"></span>
   </div>
 </header>
-
-<div class="vitals-section">
-  <div class="card vitals-card">
-    <div class="vitals-toolbar">
-      <h2 style="margin:0;">📊 バイタル（睡眠・歩数）</h2>
-      <div class="period-toggle ui-fade">
-        <button class="btn secondary" data-mode="recent">直近50日</button>
-        <button class="btn secondary" data-mode="recent100">直近100日</button>
-        <button class="btn secondary" data-mode="recent200">直近200日</button>
-        <button class="btn secondary" data-mode="recent300">直近300日</button>
-        <button class="btn secondary" data-mode="week">週次</button>
-        <button class="btn secondary" data-mode="month">月次</button>
-      </div>
-    </div>
-    <div id="chartsContainer">
-      <div class="chart-box"><canvas id="vitalsChart"></canvas></div>
-    </div>
-    <div class="external-link-row">
-      <a class="btn secondary" href="https://dashboard.exercise.quest/history" target="_blank" rel="noopener">📈 Exercise Dashboard の履歴を開く</a>
-      <a class="btn secondary" href="https://hanazonomental.com/" target="_blank" rel="noopener">🏥 病院のホームページ</a>
-    </div>
-    <div class="import-row">
-      <label class="btn secondary csv-import-label">睡眠CSVインポート<input type="file" id="sleepCsvInput" accept=".csv"></label>
-      <label class="btn secondary csv-import-label">歩数CSVインポート<input type="file" id="stepsCsvInput" accept=".csv"></label>
-      <button class="btn secondary" id="saveChartImageBtn">🖼 グラフを画像保存</button>
-    </div>
-    <div class="hint">CSVは date/day/timestamp 列 と overall_score(睡眠スコア)/steps 列を自動検出します。</div>
-  </div>
-</div>
 
 <div class="app">
   <div class="left fade-on-editor-focus">
@@ -403,14 +346,40 @@
     <div class="status-row">
       <span id="saveStatus"></span>
     </div>
+<div class="vitals-section">
+  <div class="card vitals-card">
+    <div class="vitals-toolbar">
+      <h2 style="margin:0;">📊 バイタル（睡眠・歩数）</h2>
+      <div class="period-toggle ui-fade">
+        <button class="btn secondary" data-mode="recent">直近50日</button>
+        <button class="btn secondary" data-mode="recent100">直近100日</button>
+        <button class="btn secondary" data-mode="recent200">直近200日</button>
+        <button class="btn secondary" data-mode="recent300">直近300日</button>
+        <button class="btn secondary" data-mode="week">週次</button>
+        <button class="btn secondary" data-mode="month">月次</button>
+      </div>
+    </div>
+    <div id="chartsContainer">
+      <div class="chart-box"><canvas id="vitalsChart"></canvas></div>
+    </div>
+    <div class="external-link-row">
+      <a class="btn secondary" href="https://dashboard.exercise.quest/history" target="_blank" rel="noopener">📈 Exercise Dashboard の履歴を開く</a>
+      <a class="btn secondary" href="https://hanazonomental.com/" target="_blank" rel="noopener">🏥 病院のホームページ</a>
+    </div>
+    <div class="import-row">
+      <label class="btn secondary csv-import-label">睡眠CSVインポート<input type="file" id="sleepCsvInput" accept=".csv"></label>
+      <label class="btn secondary csv-import-label">歩数CSVインポート<input type="file" id="stepsCsvInput" accept=".csv"></label>
+      <button class="btn secondary" id="saveChartImageBtn">🖼 グラフを画像保存</button>
+    </div>
+    <div class="hint">CSVは date/day/timestamp 列 と overall_score(睡眠スコア)/steps 列を自動検出します。</div>
+  </div>
+</div>
     <button type="button" class="reveal-cover" id="revealBtn">📋 メモをコピーして表示</button>
   </div>
   <nav class="pager" aria-label="エントリの切替">
-    <div class="pager-inner">
       <button type="button" id="pagerPrev" aria-label="前（古い）のメモ" title="古いメモ">▾</button>
       <span class="pager-count" id="pagerCount"></span>
       <button type="button" id="pagerNext" aria-label="次（新しい）のメモ" title="新しいメモ">▴</button>
-    </div>
   </nav>
 </div>
 
@@ -447,28 +416,6 @@
     <img id="lightboxImage" alt="">
     <button type="button" class="lightbox-nav lightbox-next" id="lightboxNextBtn" aria-label="次の画像">›</button>
   </div>
-</dialog>
-
-<dialog id="guestLinksDialog" class="guest-links-dialog">
-  <div class="guest-links-head">
-    <h2 style="margin:0;">🔗 一時URL（ゲスト閲覧用）</h2>
-    <button type="button" class="btn secondary" id="guestLinksCloseBtn">閉じる</button>
-  </div>
-  <div class="guest-links-issue-row">
-    <select id="guestLinkHours">
-      <option value="1">1時間</option>
-      <option value="24" selected>24時間</option>
-      <option value="72">3日</option>
-      <option value="168">7日</option>
-      <option value="720">30日</option>
-    </select>
-    <button type="button" class="btn" id="guestLinkCreateBtn">発行</button>
-  </div>
-  <div class="guest-link-result" id="guestLinkResult">
-    <input type="text" id="guestLinkResultUrl" readonly>
-    <button type="button" class="btn secondary" id="guestLinkCopyBtn">URLをコピー</button>
-  </div>
-  <div class="guest-links-list" id="guestLinksList"></div>
 </dialog>
 
 <footer>通院メモ &middot; データは Neon PostgreSQL に保存されます</footer>
@@ -540,11 +487,8 @@ function applyRoleToUI(role) {
     // Guests only ever see the read-only doctor-facing view; hide anything
     // that lets them switch to (or reach) the editing UI.
     document.body.classList.add('view-mode');
-    document.getElementById('modeToggleBtn').style.display = 'none';
-    document.getElementById('guestLinksBtn').style.display = 'none';
   } else if (role === 'admin') {
-    document.getElementById('modeToggleBtn').style.display = '';
-    document.getElementById('guestLinksBtn').style.display = 'inline-block';
+    prepareGuestLink();
   }
 }
 
@@ -620,105 +564,40 @@ document.getElementById('authGateForm').addEventListener('submit', async (e) => 
 });
 
 // ---------------------------------------------------------------------
-// Guest links (admin-only): issue/list/revoke time-limited read-only URLs
+// Guest link (admin-only): a token is created ahead of time but only starts
+// its 24h window when "l" is pressed, which also copies the URL.
 // ---------------------------------------------------------------------
 
-function formatGuestLinkTime(iso) {
-  const d = new Date(iso);
-  return `${fmtDate(d)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
+let preparedGuestLink = null;
 
-async function loadGuestLinks() {
-  const listEl = document.getElementById('guestLinksList');
-  listEl.innerHTML = '<div class="guest-link-empty">読み込み中…</div>';
-  let links;
+async function prepareGuestLink() {
   try {
-    links = await apiGet('/api/guest-links');
-  } catch (e) {
-    listEl.innerHTML = '<div class="guest-link-empty">一覧の取得に失敗しました。</div>';
-    return;
-  }
-
-  if (!links.length) {
-    listEl.innerHTML = '<div class="guest-link-empty">発行済みの一時URLはありません。</div>';
-    return;
-  }
-
-  listEl.innerHTML = '';
-  links.forEach(link => {
-    const inactive = link.revoked || link.expired;
-    const row = document.createElement('div');
-    row.className = 'guest-link-row' + (inactive ? ' inactive' : '');
-
-    const tokenSpan = document.createElement('span');
-    tokenSpan.className = 'guest-link-token';
-    tokenSpan.textContent = `…${link.token.slice(-8)}`;
-    row.appendChild(tokenSpan);
-
-    const expirySpan = document.createElement('span');
-    expirySpan.className = 'guest-link-expiry';
-    expirySpan.textContent = link.revoked
-      ? '失効済み'
-      : link.expired
-      ? '期限切れ'
-      : `〜${formatGuestLinkTime(link.expires_at)}`;
-    row.appendChild(expirySpan);
-
-    if (!inactive) {
-      const revokeBtn = document.createElement('button');
-      revokeBtn.type = 'button';
-      revokeBtn.className = 'btn secondary';
-      revokeBtn.textContent = '失効';
-      revokeBtn.addEventListener('click', async () => {
-        revokeBtn.disabled = true;
-        try {
-          await fetch(`/api/guest-links/${link.id}`, { method: 'DELETE', headers: authHeaders() });
-        } catch (e) { /* ignore, list refresh below will reflect actual state */ }
-        loadGuestLinks();
-      });
-      row.appendChild(revokeBtn);
-    }
-
-    listEl.appendChild(row);
-  });
-}
-
-document.getElementById('guestLinksBtn').addEventListener('click', () => {
-  document.getElementById('guestLinkResult').classList.remove('visible');
-  document.getElementById('guestLinksDialog').showModal();
-  loadGuestLinks();
-});
-document.getElementById('guestLinksCloseBtn').addEventListener('click', () => {
-  document.getElementById('guestLinksDialog').close();
-});
-
-document.getElementById('guestLinkCreateBtn').addEventListener('click', async () => {
-  const hours = Number(document.getElementById('guestLinkHours').value);
-  const btn = document.getElementById('guestLinkCreateBtn');
-  btn.disabled = true;
+    const stored = JSON.parse(localStorage.getItem('preparedGuestLink') || 'null');
+    if (stored && stored.id && stored.token) { preparedGuestLink = stored; return; }
+  } catch (e) { /* fall through and create a fresh one */ }
   try {
     const res = await fetch('/api/guest-links', {
       method: 'POST',
       headers: authHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ hours }),
+      body: JSON.stringify({ pending: true }),
     });
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) return;
     const link = await res.json();
-    const url = `${location.origin}/?guest=${encodeURIComponent(link.token)}`;
-    const urlInput = document.getElementById('guestLinkResultUrl');
-    urlInput.value = url;
-    document.getElementById('guestLinkResult').classList.add('visible');
-    urlInput.select();
-    loadGuestLinks();
-  } catch (e) {
-    alert('発行に失敗しました: ' + e.message);
-  }
-  btn.disabled = false;
-});
+    preparedGuestLink = { id: link.id, token: link.token };
+    localStorage.setItem('preparedGuestLink', JSON.stringify(preparedGuestLink));
+  } catch (e) { /* offline: retried on the next key press */ }
+}
 
-document.getElementById('guestLinkCopyBtn').addEventListener('click', function () {
-  copyToClipboard(document.getElementById('guestLinkResultUrl').value, this);
-});
+async function copyGuestLink() {
+  if (state.role !== 'admin') return;
+  if (!preparedGuestLink) { await prepareGuestLink(); if (!preparedGuestLink) return; }
+  const link = preparedGuestLink;
+  preparedGuestLink = null;
+  localStorage.removeItem('preparedGuestLink');
+  navigator.clipboard.writeText(`${location.origin}/?guest=${encodeURIComponent(link.token)}`);
+  fetch(`/api/guest-links/${link.id}/activate`, { method: 'POST', headers: authHeaders() })
+    .finally(prepareGuestLink);
+}
 
 // ---------------------------------------------------------------------
 // Networking + offline cache
@@ -977,7 +856,7 @@ document.getElementById('pagerNext').addEventListener('click', () => turnPage(1)
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
   if (e.ctrlKey || e.metaKey || e.shiftKey) return;
-  if (document.querySelector('dialog[open]') || document.body.classList.contains('show-vitals')) return;
+  if (document.querySelector('dialog[open]')) return;
   const t = e.target;
   const typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
   if (typing && !e.altKey) return; // plain arrows belong to the caret while typing
@@ -1001,19 +880,6 @@ document.addEventListener('keydown', (e) => {
     if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) turnPage(dx > 0 ? -1 : 1);
   }, { passive: true });
 })();
-
-// Vitals chart lives in a frosted overlay opened from the dock.
-function setVitalsOpen(open) {
-  document.body.classList.toggle('show-vitals', open);
-}
-document.getElementById('vitalsToggleBtn').addEventListener('click', () =>
-  setVitalsOpen(!document.body.classList.contains('show-vitals')));
-document.querySelector('.vitals-section').addEventListener('click', (e) => {
-  if (e.target === e.currentTarget) setVitalsOpen(false);
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') setVitalsOpen(false);
-});
 
 document.getElementById('jumpBtn').addEventListener('click', () => {
   const v = document.getElementById('jumpDateInput').value;
@@ -1569,17 +1435,31 @@ document.getElementById('copyBtn').addEventListener('click', function () {
   copyToClipboard(document.getElementById('contentEdit').value, this);
 });
 
-const modeToggleBtn = document.getElementById('modeToggleBtn');
-modeToggleBtn.addEventListener('click', () => {
+function toggleMode() {
+  if (state.role !== 'admin') return;
   const viewMode = document.body.classList.toggle('view-mode');
-  modeToggleBtn.textContent = viewMode ? '✏️' : '🩺';
-  modeToggleBtn.title = modeToggleBtn.ariaLabel = viewMode ? '編集モードに切替' : '閲覧モードに切替';
   if (viewMode) setCovered(!!document.getElementById('contentEdit').value.trim());
   if (!viewMode) {
     document.getElementById('jumpDateInput').value = VitalsChart.fmtDate(new Date());
     state.selectedDate = document.getElementById('jumpDateInput').value;
     loadEditorForSelectedDate();
   }
+}
+
+// e: switch edit/view mode, l: copy a 24h guest link. Escape leaves the
+// textarea so the keys work again.
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (document.activeElement && document.activeElement.id === 'contentEdit') document.activeElement.blur();
+    return;
+  }
+  if (e.key !== 'e' && e.key !== 'l') return;
+  if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || e.isComposing) return;
+  if (document.querySelector('dialog[open]') || document.body.classList.contains('auth-locked')) return;
+  const t = e.target;
+  if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+  e.preventDefault();
+  if (e.key === 'e') toggleMode(); else copyGuestLink();
 });
 
 // ---------------------------------------------------------------------

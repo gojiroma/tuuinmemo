@@ -217,12 +217,9 @@ body {
 }
 body > header { order: 0; }
 body > .app { order: 1; }
-body > .vitals-section { order: 2; }
 body > footer { order: 3; }
-body > .app,
-body > .vitals-section { width: 100%; }
+body > .app { width: 100%; }
 
 @media (max-width: 860px) {
   body > .app { padding-top: 12px; }
-  body > .vitals-section { padding-top: 8px; }
 }
