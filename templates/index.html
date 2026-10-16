@@ -164,7 +164,6 @@
   body.view-mode .jump-row,
   body.view-mode .entry-delete,
   body.view-mode #historyBtn,
-  body.view-mode #templateBtn,
   body.view-mode #combineImagesBtn,
   body.view-mode #saveStatus,
   body.view-mode #contentEdit,
@@ -335,7 +334,6 @@
     <div class="editor-toolbar">
       <div class="group">
         <button class="btn secondary" id="historyBtn">🕘 編集履歴</button>
-        <button class="btn secondary" id="templateBtn">4セクション挿入</button>
         <button class="btn secondary" id="combineImagesBtn">🖼 画像を結合保存</button>
       </div>
     </div>
@@ -352,9 +350,6 @@
       <h2 style="margin:0;">📊 バイタル（睡眠・歩数）</h2>
       <div class="period-toggle ui-fade">
         <button class="btn secondary" data-mode="recent">直近50日</button>
-        <button class="btn secondary" data-mode="recent100">直近100日</button>
-        <button class="btn secondary" data-mode="recent200">直近200日</button>
-        <button class="btn secondary" data-mode="recent300">直近300日</button>
         <button class="btn secondary" data-mode="week">週次</button>
         <button class="btn secondary" data-mode="month">月次</button>
       </div>
@@ -376,11 +371,6 @@
 </div>
     <button type="button" class="reveal-cover" id="revealBtn">📋 メモをコピーして表示</button>
   </div>
-  <nav class="pager" aria-label="エントリの切替">
-      <button type="button" id="pagerPrev" aria-label="前（古い）のメモ" title="古いメモ">▾</button>
-      <span class="pager-count" id="pagerCount"></span>
-      <button type="button" id="pagerNext" aria-label="次（新しい）のメモ" title="新しいメモ">▴</button>
-  </nav>
 </div>
 
 <dialog id="historyDialog" class="history-dialog">
@@ -424,15 +414,6 @@
 <script src="{{ url_for('static', filename='vitals-chart.js') }}"></script>
 <script src="{{ url_for('static', filename='markdown-editor.js') }}"></script>
 <script>
-const TEMPLATE = `## 生活変化
-
-## 体調
-
-## 今後の意向
-
-## 質問・相談・依頼
-`;
-
 const WEEKDAY_JA = ['日', '月', '火', '水', '木', '金', '土'];
 
 const state = {
@@ -488,6 +469,7 @@ function applyRoleToUI(role) {
     // that lets them switch to (or reach) the editing UI.
     document.body.classList.add('view-mode');
   } else if (role === 'admin') {
+    document.body.classList.remove('view-mode');
     prepareGuestLink();
   }
 }
@@ -808,7 +790,6 @@ function loadEditorForSelectedDate() {
 
   setSaveStatus(draft ? '未同期の下書きがあります' : '', draft ? 'offline' : '');
   updatePreview();
-  updatePager();
   setCovered(!!(base.content || '').trim());
 }
 
@@ -819,13 +800,23 @@ function setCovered(on) {
 }
 document.getElementById('revealBtn').addEventListener('click', () => {
   const text = document.getElementById('contentEdit').value;
-  const reveal = () => setCovered(false);
+  const card = document.getElementById('editorCard');
+  const btn = document.getElementById('revealBtn');
+  const reveal = () => {
+    btn.textContent = 'コピーしました！';
+    card.classList.add('revealing');
+    setTimeout(() => {
+      setCovered(false);
+      card.classList.remove('revealing');
+      btn.textContent = '📋 メモをコピーして表示';
+    }, 900);
+  };
   // Reveal even if the clipboard is unavailable (insecure context, denied).
   try { navigator.clipboard.writeText(text).then(reveal, reveal); } catch (e) { reveal(); }
 });
 
 // ---------------------------------------------------------------------
-// Page-turning: ←/→, swipe or the pager step through entries by date.
+// Page-turning: ←/→ or swipe step through entries by date.
 // Works from the selected date, so an unsaved (new) date is a valid spot.
 // ---------------------------------------------------------------------
 
@@ -836,22 +827,10 @@ function stepDate(dir) { // dir: -1 = older, +1 = newer
   return next || null;
 }
 
-function updatePager() {
-  const dates = state.entries.map(m => m.date).sort();
-  const idx = dates.indexOf(state.selectedDate);
-  document.getElementById('pagerCount').textContent =
-    dates.length ? `${idx >= 0 ? idx + 1 : '＋'} / ${dates.length}` : '';
-  document.getElementById('pagerPrev').disabled = !stepDate(-1);
-  document.getElementById('pagerNext').disabled = !stepDate(1);
-}
-
 function turnPage(dir) {
   const d = stepDate(dir);
   if (d) selectDate(d);
 }
-
-document.getElementById('pagerPrev').addEventListener('click', () => turnPage(-1));
-document.getElementById('pagerNext').addEventListener('click', () => turnPage(1));
 
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
@@ -1094,7 +1073,8 @@ async function autosaveNow() {
     if (!res.ok) throw new Error(await res.text());
     const memo = await res.json();
     state.entriesByDate[dateStr] = memo;
-    if (!state.entries.some(m => m.date === dateStr)) {
+    const isNewDate = !state.entries.some(m => m.date === dateStr);
+    if (isNewDate) {
       state.entries.unshift(memo);
       state.entries.sort((a, b) => b.date.localeCompare(a.date));
     } else {
@@ -1104,7 +1084,9 @@ async function autosaveNow() {
     clearDraft(dateStr);
     setSaveStatus('保存しました ✓', 'saved');
     renderEntryList();
-    renderCharts();
+    // Only a brand-new date adds a clinic-day marker; redrawing on every
+    // autosave would flicker the chart while typing.
+    if (isNewDate) renderCharts();
   } catch (e) {
     saveDraft(dateStr, payload);
     setSaveStatus('オフラインのため下書き保存しました', 'offline');
@@ -1118,17 +1100,6 @@ document.getElementById('contentEdit').addEventListener('keydown', function (e) 
 });
 document.getElementById('contentEdit').addEventListener('focus', () => document.body.classList.add('editor-focused'));
 document.getElementById('contentEdit').addEventListener('blur', () => document.body.classList.remove('editor-focused'));
-
-document.getElementById('templateBtn').addEventListener('click', () => {
-  const el = document.getElementById('contentEdit');
-  if (!el.value.trim()) {
-    el.value = TEMPLATE;
-  } else {
-    el.value += (el.value.endsWith('\n') ? '' : '\n') + '\n' + TEMPLATE;
-  }
-  onFormInput();
-  updatePreview();
-});
 
 async function deleteEntry(dateStr) {
   if (!confirm(`${dateStr} のメモを削除しますか？`)) return;
@@ -1478,8 +1449,8 @@ function startApp() {
   setStatus(navigator.onLine ? 'オンライン' : 'オフライン', !navigator.onLine);
 
   loadEntries().then(() => {
-    // Land on the latest entry rather than today's (likely blank) date, since
-    // the page always opens in view mode first.
+    // Land on the latest entry rather than today's (likely blank) date;
+    // the editor opens on the newest memo rather than a blank today.
     if (state.entries.length) {
       state.selectedDate = state.entries[0].date;
       document.getElementById('jumpDateInput').value = state.selectedDate;

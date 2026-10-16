@@ -82,15 +82,9 @@
       : hexToRgba(STEPS_COLOR, 0.55);
   }
 
-  // Sleep score thresholds so the line reads at a glance instead of needing
-  // the axis checked: 90+ green, 80+ blue, 60+ orange, below that red.
-  function scoreColor(score) {
-    if (score == null) return 'transparent'; // gap — no point/segment actually drawn here
-    if (score >= 90) return '#6f8f45';
-    if (score >= 80) return '#3f7cae';
-    if (score >= 60) return '#e0793a';
-    return '#b23b2c';
-  }
+  // Sleep stays in blue so it never reads as the green step bars or the
+  // orange clinic-day markers.
+  const SLEEP_COLOR = '#2f6fb5';
 
   const RECENT_DAYS = 50; // default for the plain 'recent' mode (kept for backward compat)
   const FIXED_RANGE_START = '2025-12-01'; // week/month: fixed start covering all entries, not a rolling window
@@ -200,19 +194,14 @@
             label: '睡眠スコア',
             data: sleepSeries.values,
             spanGaps: false, // null (no reading / a 0 tracking error) breaks the line instead of drawing a fake dip
-            borderColor: '#a8763f',
-            backgroundColor: '#a8763f',
+            borderColor: SLEEP_COLOR,
+            backgroundColor: SLEEP_COLOR,
             borderWidth: 3,
-            pointBackgroundColor: sleepSeries.values.map((v, i) => sleepSeries.colors[i] || scoreColor(v)),
+            pointBackgroundColor: SLEEP_COLOR,
             // A light halo around every dot keeps it legible sitting on top of the step bars.
             pointBorderColor: cardBg,
             pointBorderWidth: 2,
-            pointRadius: sleepSeries.colors.map(c => c ? 6 : 3),
-            segment: {
-              // Color each line segment by the score it's heading into, so the
-              // trend itself carries the green/blue/orange/red read, not just the dots.
-              borderColor: ctx => scoreColor(ctx.p1.parsed.y),
-            },
+            pointRadius: 3,
             tension: 0.25,
             yAxisID: 'ySleep',
           },
