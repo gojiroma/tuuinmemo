@@ -92,11 +92,11 @@
   .date-label-group { display: flex; align-items: baseline; gap: 8px; }
   .selected-date-label { font-weight: 700; font-size: 1.1rem; }
   .selected-date-weekday { font-size: 0.85rem; color: var(--text-dim); }
-  .copy-btn { display: none; font-size: 0.78rem; padding: 5px 12px; opacity: 0.5; transition: opacity var(--t-fast); animation: pulse 2s infinite; }
-  .copy-btn:hover { opacity: 1; animation: none; }
+  .head-actions { display: flex; gap: 6px; align-items: center; }
+  #guestLinkBtn[hidden] { display: none; }
+  .copy-btn { display: none; font-size: 0.78rem; padding: 5px 12px; }
   body:not(.view-mode) .copy-btn { display: inline-block; }
   body.view-mode .copy-btn { display: inline-block; }
-  @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
 
   .editor-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; }
   .editor-toolbar .group { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -299,12 +299,7 @@
     <div class="auth-gate-error" id="authGateError"></div>
   </form>
 </div>
-<header>
-  <h1>📋 通院メモ</h1>
-  <div class="header-right">
-    <span id="statusBadge" class="ui-fade"></span>
-  </div>
-</header>
+<span id="statusBadge"></span>
 
 <div class="app">
   <div class="left fade-on-editor-focus">
@@ -323,7 +318,10 @@
         <span class="selected-date-label" id="selectedDateLabel"></span>
         <span class="selected-date-weekday" id="selectedDateWeekday"></span>
       </div>
-      <button class="btn secondary copy-btn" id="copyBtn">メモをコピー</button>
+      <div class="head-actions">
+        <button class="btn secondary" id="guestLinkBtn" title="24時間公開URLをコピー" aria-label="24時間公開URLをコピー" hidden>🔗</button>
+        <button class="btn secondary copy-btn" id="copyBtn">メモをコピー</button>
+      </div>
     </div>
 
     <div class="editor-toolbar">
@@ -464,6 +462,7 @@ function applyRoleToUI(role) {
     document.body.classList.add('view-mode');
   } else if (role === 'admin') {
     document.body.classList.remove('view-mode');
+    document.getElementById('guestLinkBtn').hidden = false;
     prepareGuestLink();
   }
 }
@@ -571,6 +570,10 @@ async function copyGuestLink() {
   preparedGuestLink = null;
   localStorage.removeItem('preparedGuestLink');
   navigator.clipboard.writeText(`${location.origin}/?guest=${encodeURIComponent(link.token)}`);
+  const btn = document.getElementById('guestLinkBtn');
+  btn.textContent = '✓';
+  btn.title = 'コピーしました（24時間有効）';
+  setTimeout(() => { btn.textContent = '🔗'; btn.title = '24時間公開URLをコピー'; }, 1800);
   fetch(`/api/guest-links/${link.id}/activate`, { method: 'POST', headers: authHeaders() })
     .finally(prepareGuestLink);
 }
@@ -761,6 +764,7 @@ function selectDate(dateStr) {
 }
 
 function loadEditorForSelectedDate() {
+  document.getElementById('editorCard').classList.remove('copied-reveal');
   const dateStr = state.selectedDate;
   document.getElementById('selectedDateLabel').textContent = dateStr;
   document.getElementById('selectedDateWeekday').textContent = `(${weekdayLabel(dateStr)})`;
@@ -788,7 +792,7 @@ document.getElementById('revealBtn').addEventListener('click', () => {
   const btn = document.getElementById('revealBtn');
   const reveal = () => {
     btn.textContent = 'コピーしました！';
-    card.classList.add('revealing');
+    card.classList.add('revealing', 'copied-reveal');
     setTimeout(() => {
       setCovered(false);
       card.classList.remove('revealing');
@@ -1362,6 +1366,8 @@ function toggleMode() {
     loadEditorForSelectedDate();
   }
 }
+
+document.getElementById('guestLinkBtn').addEventListener('click', copyGuestLink);
 
 // e: switch edit/view mode, l: copy a 24h guest link. Escape leaves the
 // textarea so the keys work again.
