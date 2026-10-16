@@ -85,6 +85,17 @@
   .date-label-group { display: flex; align-items: baseline; gap: 8px; }
   .selected-date-label { font-weight: 700; font-size: 1.1rem; }
   .selected-date-weekday { font-size: 0.85rem; color: var(--text-dim); }
+  .toast {
+    position: fixed; left: 50%; bottom: 28px; z-index: 100;
+    transform: translate(-50%, 12px); opacity: 0; pointer-events: none;
+    padding: 10px 20px; border-radius: 999px;
+    background: var(--glass-strong); color: var(--accent);
+    border: 1px solid var(--glass-edge); box-shadow: var(--shadow-md);
+    -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+    font-size: 0.9rem; font-weight: 600;
+    transition: opacity 0.25s, transform 0.25s;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
   .head-actions { display: flex; gap: 6px; align-items: center; }
   #guestLinkBtn[hidden] { display: none; }
   .copy-btn { display: none; font-size: 0.78rem; padding: 5px 12px; }
@@ -300,6 +311,7 @@
   </form>
 </div>
 <span id="statusBadge"></span>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <div class="app">
   <div class="left fade-on-editor-focus">
@@ -574,13 +586,26 @@ async function prepareGuestLink() {
   } catch (e) { /* offline: retried on the next key press */ }
 }
 
+let toastTimer = null;
+function showToast(text) {
+  const el = document.getElementById('toast');
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
 async function copyGuestLink() {
   if (state.role !== 'admin') return;
-  if (!preparedGuestLink) { await prepareGuestLink(); if (!preparedGuestLink) return; }
+  if (!preparedGuestLink) {
+    await prepareGuestLink();
+    if (!preparedGuestLink) { showToast('URLを用意できませんでした'); return; }
+  }
   const link = preparedGuestLink;
   preparedGuestLink = null;
   localStorage.removeItem('preparedGuestLink');
   navigator.clipboard.writeText(`${location.origin}/?guest=${encodeURIComponent(link.token)}`);
+  showToast('🔗 24時間公開URLをコピーしました');
   const btn = document.getElementById('guestLinkBtn');
   btn.textContent = '✓';
   btn.title = 'コピーしました（24時間有効）';
