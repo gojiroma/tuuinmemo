@@ -346,13 +346,13 @@
     <div class="external-link-row">
       <a class="btn secondary" href="https://dashboard.exercise.quest/history" target="_blank" rel="noopener">📈 Exercise Dashboard の履歴を開く</a>
       <a class="btn secondary" href="https://hanazonomental.com/" target="_blank" rel="noopener">🏥 病院のホームページ</a>
+      <a class="btn secondary" href="https://takeout.google.com" target="_blank" rel="noopener">📦 Google Takeout</a>
     </div>
     <div class="import-row">
-      <label class="btn secondary csv-import-label">睡眠CSVインポート<input type="file" id="sleepCsvInput" accept=".csv"></label>
-      <label class="btn secondary csv-import-label">歩数CSVインポート<input type="file" id="stepsCsvInput" accept=".csv"></label>
+      <label class="btn secondary csv-import-label">CSVインポート（Sleep Score / Steps 自動判別）<input type="file" id="csvInput" accept=".csv"></label>
       <button class="btn secondary" id="saveChartImageBtn">🖼 グラフを画像保存</button>
     </div>
-    <div class="hint">CSVは date/day/timestamp 列 と overall_score(睡眠スコア)/steps 列を自動検出します。</div>
+    <div class="hint">CSVは date/day/timestamp 列 と overall_score(睡眠スコア)/steps 列から、睡眠か歩数かを自動判別します。</div>
   </div>
 </div>
     <button type="button" class="reveal-cover" id="revealBtn">📋 メモをコピーして表示</button>
@@ -1311,17 +1311,16 @@ document.getElementById('saveChartImageBtn').addEventListener('click', () => {
 // CSV import
 // ---------------------------------------------------------------------
 
-async function importCsv(inputEl, type) {
+async function importCsv(inputEl) {
   const file = inputEl.files[0];
   if (!file) return;
   const form = new FormData();
   form.append('file', file);
-  form.append('type', type);
   try {
     const res = await fetch('/api/vitals/import-csv', { method: 'POST', headers: authHeaders(), body: form });
     const result = await res.json();
     if (!res.ok) throw new Error(result.error || 'import failed');
-    alert(`${result.imported}件インポートしました（既存の日付は上書き。形式エラーで${result.skipped}件スキップ）`);
+    alert(`${result.type === 'steps' ? '歩数' : '睡眠スコア'}を${result.imported}件インポートしました（既存の日付は上書き。形式エラーで${result.skipped}件スキップ）`);
     loadVitals();
   } catch (e) {
     alert('インポートに失敗しました: ' + e.message);
@@ -1329,8 +1328,7 @@ async function importCsv(inputEl, type) {
   inputEl.value = '';
 }
 
-document.getElementById('sleepCsvInput').addEventListener('change', e => importCsv(e.target, 'sleep'));
-document.getElementById('stepsCsvInput').addEventListener('change', e => importCsv(e.target, 'steps'));
+document.getElementById('csvInput').addEventListener('change', e => importCsv(e.target));
 
 // ---------------------------------------------------------------------
 // Mode toggle (edit <-> doctor-facing read-only view, same page/URL)

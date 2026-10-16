@@ -616,9 +616,9 @@ def parse_date_cell(value):
 @app.route("/api/vitals/import-csv", methods=["POST"])
 @require_access(admin_only=True)
 def import_vitals_csv():
-    data_type = request.form.get("type") or request.args.get("type")
-    if data_type not in ("sleep", "steps"):
-        return jsonify({"error": "type must be 'sleep' or 'steps'"}), 400
+    data_type = request.form.get("type") or request.args.get("type") or "auto"
+    if data_type not in ("auto", "sleep", "steps"):
+        return jsonify({"error": "type must be 'auto', 'sleep' or 'steps'"}), 400
 
     file = request.files.get("file")
     if not file:
@@ -630,6 +630,21 @@ def import_vitals_csv():
         return jsonify({"error": "empty CSV"}), 400
 
     date_key = find_key(reader.fieldnames, DATE_KEYS)
+
+    if data_type == "auto":
+        # Sleep Score CSVs carry a score column; Steps CSVs a steps column.
+        # If both (or neither) show up, the file name breaks the tie.
+        has_sleep = bool(find_key(reader.fieldnames, SCORE_KEYS) or find_key(reader.fieldnames, DURATION_KEYS))
+        has_steps = bool(find_key(reader.fieldnames, STEPS_KEYS))
+        name = (file.filename or "").lower()
+        if has_sleep != has_steps:
+            data_type = "sleep" if has_sleep else "steps"
+        elif "step" in name:
+            data_type = "steps"
+        elif "sleep" in name:
+            data_type = "sleep"
+        else:
+            return jsonify({"error": "could not tell Sleep Score from Steps", "found_columns": reader.fieldnames}), 400
 
     if data_type == "sleep":
         col = "score"
@@ -675,7 +690,7 @@ def import_vitals_csv():
             )
         conn.commit()
 
-    return jsonify({"imported": len(rows), "skipped": len(errors), "errors": errors[:20]})
+    return jsonify({"type": data_type, "imported": len(rows), "skipped": len(errors), "errors": errors[:20]})
 
 
 @app.route("/api/health", methods=["GET"])

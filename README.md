@@ -64,7 +64,7 @@ PWAとしてホーム画面に追加した場合の起動先も`/`です。
 | PUT / DELETE | `/api/memo/<id>` | ID指定での更新・削除 | 管理者のみ |
 | GET | `/api/memo/<id>/history` | 編集履歴の一覧（新しい順、デフォルト50件・最大200件） | 管理者/ゲスト |
 | GET | `/api/vitals?start=YYYY-MM-DD&end=YYYY-MM-DD` | 睡眠・歩数データ取得（省略時は直近50日） | 管理者/ゲスト |
-| POST | `/api/vitals/import-csv` | CSVインポート（`type=sleep`\|`steps`, `file`） | 管理者のみ |
+| POST | `/api/vitals/import-csv` | CSVインポート（`file`。`type`は省略時`auto`で列名から睡眠/歩数を自動判別、`sleep`\|`steps`で明示も可） | 管理者のみ |
 | GET | `/api/search-history?limit=20` | 直近使ったキーワード検索語（新しい順、デフォルト20件・最大100件） | 管理者/ゲスト |
 | POST | `/api/search-history` | 検索語を履歴に保存（`{"query": "..."}`、同じ語なら日時だけ更新） | 管理者のみ |
 | GET | `/api/guest-links` | 発行済み一時URLトークンの一覧 | 管理者のみ |
