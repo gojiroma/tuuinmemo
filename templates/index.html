@@ -52,14 +52,7 @@
   .entry-top { display: flex; align-items: baseline; gap: 7px; }
   .entry-date { font-size: 0.85rem; font-weight: 600; }
   .entry-weekday { font-size: 0.72rem; color: var(--text-faint); }
-  .entry-today {
-    font-size: 0.65rem;
-    color: var(--accent);
-    background: var(--accent-dim);
-    border-radius: 999px;
-    padding: 1px 7px;
-    font-weight: 600;
-  }
+  .entry-ago { margin-left: auto; font-size: 0.72rem; color: var(--text-faint); }
   .entry-summary {
     font-size: 0.78rem;
     color: var(--text-dim);
@@ -699,12 +692,11 @@ function renderEntryList() {
     wdSpan.textContent = weekdayLabel(m.date);
     top.appendChild(wdSpan);
 
-    if (m.date === today) {
-      const todayTag = document.createElement('span');
-      todayTag.className = 'entry-today';
-      todayTag.textContent = '今日';
-      top.appendChild(todayTag);
-    }
+    const days = Math.round((new Date(today + 'T00:00:00') - new Date(m.date + 'T00:00:00')) / 86400000);
+    const agoSpan = document.createElement('span');
+    agoSpan.className = 'entry-ago';
+    agoSpan.textContent = days === 0 ? '今日' : days > 0 ? `${days}日前` : `${-days}日後`;
+    top.appendChild(agoSpan);
     main.appendChild(top);
 
     const preview = document.createElement('div');
