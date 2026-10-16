@@ -29,7 +29,6 @@
   }
 
   /* Entry list -------------------------------------------------- */
-  .search-row { margin-bottom: 10px; }
   .jump-row { display: flex; gap: 6px; margin-bottom: 12px; }
   .jump-row input[type=date] { flex: 1; }
   .entry-list {
@@ -310,10 +309,6 @@
 <div class="app">
   <div class="left fade-on-editor-focus">
     <div class="card">
-      <div class="search-row">
-        <input type="search" id="searchInput" list="searchHistoryList" placeholder="🔍">
-        <datalist id="searchHistoryList"></datalist>
-      </div>
       <div class="jump-row">
         <input type="date" id="jumpDateInput">
         <button class="btn" id="jumpBtn">開く/新規</button>
@@ -423,7 +418,6 @@ const state = {
   vitals: { sleep: [], steps: [] },
   vitalsMode: 'recent',
   currentMemoId: null,
-  searchQuery: '',
   role: null, // 'admin' | 'guest', set once the access token is verified
 };
 
@@ -668,12 +662,6 @@ window.addEventListener('offline', () => setStatus('オフライン', true));
 // Entry list
 // ---------------------------------------------------------------------
 
-function filteredEntries() {
-  const q = state.searchQuery.trim().toLowerCase();
-  if (!q) return state.entries;
-  return state.entries.filter(m => (m.content || '').toLowerCase().includes(q));
-}
-
 function renderEntryList() {
   const list = document.getElementById('entryList');
   list.innerHTML = '';
@@ -683,12 +671,7 @@ function renderEntryList() {
     return;
   }
 
-  const visible = filteredEntries();
-  if (!visible.length) {
-    list.innerHTML = '<div class="entry-empty">一致するエントリがありません。</div>';
-    return;
-  }
-
+  const visible = state.entries;
   const today = fmtDate(new Date());
 
   visible.forEach(m => {
@@ -698,7 +681,7 @@ function renderEntryList() {
 
     const main = document.createElement('div');
     main.className = 'entry-main';
-    main.addEventListener('click', () => selectDate(m.date));
+    main.addEventListener('click', () => selectDate(m.date, { reveal: true }));
 
     const top = document.createElement('div');
     top.className = 'entry-top';
@@ -750,7 +733,7 @@ function flashJumpHighlight() {
   card.classList.add('jump-highlight');
 }
 
-function selectDate(dateStr) {
+function selectDate(dateStr, { reveal = false } = {}) {
   if (dateStr === state.selectedDate) return; // already showing it
 
   if (autosaveTimer) {
@@ -767,6 +750,7 @@ function selectDate(dateStr) {
   document.getElementById('jumpDateInput').value = dateStr;
   renderEntryList();
   loadEditorForSelectedDate();
+  if (reveal) setCovered(false);
   const card = document.getElementById('editorCard');
   if (card.animate && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
     card.animate(
@@ -863,44 +847,6 @@ document.addEventListener('keydown', (e) => {
 document.getElementById('jumpBtn').addEventListener('click', () => {
   const v = document.getElementById('jumpDateInput').value;
   if (v) selectDate(v);
-});
-
-// ---------------------------------------------------------------------
-// Keyword search (client-side over all loaded entries) + server-side
-// search-term history, offered back as suggestions via a <datalist>.
-// ---------------------------------------------------------------------
-
-async function loadSearchHistory() {
-  try {
-    const queries = await apiGet('/api/search-history?limit=20');
-    const list = document.getElementById('searchHistoryList');
-    list.innerHTML = '';
-    queries.forEach(q => {
-      const opt = document.createElement('option');
-      opt.value = q;
-      list.appendChild(opt);
-    });
-  } catch (e) {
-    // suggestions are a nicety; offline/error just means an empty list
-  }
-}
-
-function saveSearchHistory(query) {
-  fetch('/api/search-history', {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ query }),
-  }).then(loadSearchHistory).catch(() => {});
-}
-
-const searchInput = document.getElementById('searchInput');
-searchInput.addEventListener('input', () => {
-  state.searchQuery = searchInput.value;
-  renderEntryList();
-});
-searchInput.addEventListener('change', () => {
-  const q = searchInput.value.trim();
-  if (q) saveSearchHistory(q);
 });
 
 // ---------------------------------------------------------------------
@@ -1460,7 +1406,6 @@ function startApp() {
     if (navigator.onLine) syncPendingDrafts();
   });
   loadVitals();
-  loadSearchHistory();
 }
 
 tryUnlockWithStoredToken().then(unlocked => {

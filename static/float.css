@@ -123,35 +123,41 @@ body:not(.view-mode) #contentView {
 }
 .status-row { margin-top: auto; }
 
-/* Entry list: date + one-line summary on the right of the card -------- */
+/* Entry list: card stays centred; the list sits quietly in the spare space on the right */
 body > .app {
+  --card-w: 820px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--card-w)) minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
-.editor-card { grid-column: 1; grid-row: 1; }
+body:not(.view-mode) > .app { --card-w: 1180px; }
+.editor-card { grid-column: 2; grid-row: 1; max-width: none !important; width: 100%; }
 .left, body:not(.view-mode) .left {
   display: block;
-  grid-column: 2;
+  grid-column: 3;
   grid-row: 1;
+  justify-self: start;
+  width: 100%;
+  max-width: 240px;
   position: sticky;
   top: 14px;
+  opacity: 0.5;
+  transition: opacity var(--t);
 }
+.left:hover { opacity: 1; }
 .left .card {
-  padding: 10px;
-  border-radius: 20px;
-  background: var(--glass);
-  border: 1px solid var(--glass-edge);
-  -webkit-backdrop-filter: blur(18px) saturate(1.4);
-  backdrop-filter: blur(18px) saturate(1.4);
-  box-shadow: var(--shadow-md);
+  padding: 6px;
+  border: none;
+  background: transparent;
+  box-shadow: none;
 }
-.left .entry-list { max-height: calc(100dvh - 160px); overflow-y: auto; }
-@media (max-width: 860px) {
+.left .entry-list { max-height: calc(100dvh - 60px); overflow-y: auto; }
+.left .entry-row .entry-summary { font-size: 0.72rem; }
+@media (max-width: 1200px) {
   body > .app { grid-template-columns: 1fr; }
-  .editor-card, .left, body:not(.view-mode) .left { grid-column: 1; position: static; }
-  .left { grid-row: 2; }
+  .editor-card, .left, body:not(.view-mode) .left { grid-column: 1; max-width: none; position: static; }
+  .left { grid-row: 2; opacity: 1; }
 }
 
 /* Vitals chart: sits at the bottom of the editor card, after the body ---- */
