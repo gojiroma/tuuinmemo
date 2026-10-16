@@ -399,6 +399,68 @@ def revoke_guest_link(link_id):
 
 
 # ---------------------------------------------------------------------------
+# Medications (name + period, plotted under the vitals chart)
+# ---------------------------------------------------------------------------
+
+def row_to_medication(row):
+    return {
+        "id": str(row["id"]),
+        "name": row["name"],
+        "start_date": row["start_date"].isoformat(),
+        "end_date": row["end_date"].isoformat() if row["end_date"] else None,
+    }
+
+
+@app.route("/api/medications", methods=["GET"])
+@require_access()
+def list_medications():
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT * FROM memo_medications ORDER BY start_date, created_at")
+            rows = cur.fetchall()
+    return jsonify([row_to_medication(r) for r in rows])
+
+
+@app.route("/api/medications", methods=["POST"])
+@require_access(admin_only=True)
+def create_medication():
+    data = request.get_json(force=True, silent=True) or {}
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+    try:
+        start = date.fromisoformat(data.get("start_date") or "")
+        end = date.fromisoformat(data["end_date"]) if data.get("end_date") else None
+    except ValueError:
+        return jsonify({"error": "dates must be YYYY-MM-DD"}), 400
+    if end and end < start:
+        return jsonify({"error": "end_date must not be before start_date"}), 400
+
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "INSERT INTO memo_medications (name, start_date, end_date) VALUES (%s, %s, %s) RETURNING *",
+                (name, start, end),
+            )
+            row = cur.fetchone()
+        conn.commit()
+    return jsonify(row_to_medication(row)), 201
+
+
+@app.route("/api/medications/<med_id>", methods=["DELETE"])
+@require_access(admin_only=True)
+def delete_medication(med_id):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM memo_medications WHERE id = %s RETURNING id", (med_id,))
+            deleted = cur.fetchone()
+        conn.commit()
+    if not deleted:
+        return jsonify({"error": "not found"}), 404
+    return jsonify({"ok": True})
+
+
+# ---------------------------------------------------------------------------
 # Search history (keyword search itself runs client-side over all loaded
 # entries; this just remembers past search terms for suggestions)
 # ---------------------------------------------------------------------------

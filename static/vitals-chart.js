@@ -68,6 +68,7 @@
     return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
   }
 
+  const MED_COLORS = ['#8b6bb8', '#c0577f', '#4a9a9a', '#b08a2e', '#5a6fb8'];
   const STEPS_AXIS_MAX = 10000; // bars above this are visually clipped, which is fine — the point is the trend, not exact high counts
   const STEPS_DARK_THRESHOLD = 12000;
   const STEPS_COLOR = '#7c9a52';
@@ -156,7 +157,7 @@
   // onHoverEntry(memo), optional: called when the cursor lands on a bucket
   // that has a memo (daily-resolution modes only), so the caller can select
   // that entry into its own entry list / detail view.
-  function renderVitalsChart(canvasEl, existingChart, entries, vitals, mode, onHoverEntry) {
+  function renderVitalsChart(canvasEl, existingChart, entries, vitals, mode, onHoverEntry, meds = []) {
     const { start, end } = vitalsRangeForMode(mode);
     const keys = bucketKeysForRange(mode, start, end);
     const clinicDates = new Set(
@@ -178,7 +179,43 @@
     if (recentDays) entries.forEach(m => { entriesByDate[m.date] = m; });
     let lastHoverIndex = null;
 
+    // Medication periods: one thin lane per medication under the x axis.
+    const groupFn = mode === 'week' ? weekStart : mode === 'month' ? monthStart : (d => d);
+    const medBars = meds.map((m, i) => {
+      const a = keys.findIndex(k => k >= groupFn(m.start_date));
+      let b = -1;
+      keys.forEach((k, idx) => { if (!m.end_date || k <= groupFn(m.end_date)) b = idx; });
+      return { name: m.name, a, b, color: MED_COLORS[i % MED_COLORS.length] };
+    });
+    const laneH = 22;
+    const medPlugin = {
+      id: 'medicationLanes',
+      afterDraw(chart) {
+        const { ctx, scales: { x }, chartArea } = chart;
+        const slot = (chartArea.right - chartArea.left) / keys.length;
+        const top0 = chart.height - medBars.length * laneH + 2;
+        medBars.forEach((bar, lane) => {
+          if (bar.a < 0 || bar.b < bar.a) return;
+          const x0 = x.getPixelForValue(bar.a) - slot / 2;
+          const x1 = x.getPixelForValue(bar.b) + slot / 2;
+          const y = top0 + lane * laneH;
+          ctx.save();
+          ctx.fillStyle = bar.color;
+          ctx.beginPath();
+          ctx.roundRect(x0, y, Math.max(x1 - x0, 4), laneH - 6, 5);
+          ctx.fill();
+          ctx.clip();
+          ctx.fillStyle = '#fff';
+          ctx.font = `bold 12px ${Chart.defaults.font.family}`;
+          ctx.textBaseline = 'middle';
+          ctx.fillText(bar.name, x0 + 6, y + (laneH - 6) / 2);
+          ctx.restore();
+        });
+      },
+    };
+
     return new Chart(canvasEl, {
+      plugins: [medPlugin],
       data: {
         labels: stepsSeries.labels,
         datasets: [
@@ -209,6 +246,7 @@
       },
       options: {
         maintainAspectRatio: false,
+        layout: { padding: { bottom: medBars.length * laneH } },
         plugins: {
           legend: {
             display: true,

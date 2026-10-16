@@ -74,3 +74,12 @@ CREATE TABLE IF NOT EXISTS guest_links (
 );
 
 CREATE INDEX IF NOT EXISTS idx_guest_links_token ON guest_links (token);
+
+-- 服薬期間（名前と開始日〜終了日。終了日が空なら継続中）
+CREATE TABLE IF NOT EXISTS memo_medications (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    name text NOT NULL,
+    start_date date NOT NULL,
+    end_date date,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
