@@ -87,7 +87,7 @@
   // orange clinic-day markers.
   const SLEEP_COLOR = '#2f6fb5';
 
-  const RECENT_DAYS = 50; // default for the plain 'recent' mode (kept for backward compat)
+  const RECENT_DAYS = 30; // default for the plain 'recent' mode (kept for backward compat)
   const FIXED_RANGE_START = '2025-12-01'; // week/month: fixed start covering all entries, not a rolling window
 
   // 'recent' == 50 days; 'recentNNN' (e.g. 'recent100') == NNN days.

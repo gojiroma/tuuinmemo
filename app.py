@@ -510,7 +510,7 @@ def save_search_history():
 @require_access()
 def get_vitals():
     end = request.args.get("end") or date.today().isoformat()
-    start = request.args.get("start") or (date.fromisoformat(end) - timedelta(days=49)).isoformat()
+    start = request.args.get("start") or (date.fromisoformat(end) - timedelta(days=29)).isoformat()
 
     where = "WHERE date BETWEEN %s AND %s"
     params = (start, end)
