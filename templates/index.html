@@ -96,6 +96,11 @@
     transition: opacity 0.25s, transform 0.25s;
   }
   .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  /* View mode keeps word labels; edit mode shows only the emoji. */
+  body.view-mode [data-label] { font-size: 0; }
+  body.view-mode [data-label]::after { content: attr(data-label); font-size: 0.84rem; }
+  body.view-mode .copy-btn[data-label]::after { font-size: 0.78rem; }
+  body.view-mode [data-label].done::after { content: 'コピーしました ✓'; }
   .head-actions { display: flex; gap: 6px; align-items: center; }
   #guestLinkBtn[hidden] { display: none; }
   .copy-btn { display: none; font-size: 0.78rem; padding: 5px 12px; }
@@ -330,8 +335,8 @@
         <span class="selected-date-weekday" id="selectedDateWeekday"></span>
       </div>
       <div class="head-actions">
-        <button class="btn secondary" id="guestLinkBtn" title="24時間公開URLをコピー" aria-label="24時間公開URLをコピー" hidden>🔗</button>
-        <button class="btn secondary copy-btn" id="copyBtn" title="メモをコピー" aria-label="メモをコピー">📋</button>
+        <button class="btn secondary" id="guestLinkBtn" data-label="🔗 24時間公開URLをコピー" title="24時間公開URLをコピー" aria-label="24時間公開URLをコピー" hidden>🔗</button>
+        <button class="btn secondary copy-btn" id="copyBtn" data-label="メモをコピー" title="メモをコピー" aria-label="メモをコピー">📋</button>
       </div>
     </div>
 
@@ -352,9 +357,9 @@
     <div class="vitals-toolbar">
       <h2 style="margin:0;">📊 バイタル（睡眠・歩数）</h2>
       <div class="period-toggle ui-fade">
-        <button class="btn secondary" data-mode="recent" title="直近30日" aria-label="直近30日">📅</button>
-        <button class="btn secondary" data-mode="week" title="週次" aria-label="週次">🗓️</button>
-        <button class="btn secondary" data-mode="month" title="月次" aria-label="月次">🈷️</button>
+        <button class="btn secondary" data-mode="recent" data-label="直近30日" title="直近30日" aria-label="直近30日">📅</button>
+        <button class="btn secondary" data-mode="week" data-label="週次" title="週次" aria-label="週次">🗓️</button>
+        <button class="btn secondary" data-mode="month" data-label="月次" title="月次" aria-label="月次">🈷️</button>
       </div>
     </div>
     <div id="chartsContainer">
@@ -371,13 +376,13 @@
       </form>
     </div>
     <div class="external-link-row">
-      <a class="btn secondary" href="https://dashboard.exercise.quest/history" target="_blank" rel="noopener" title="Exercise Dashboard の履歴" aria-label="Exercise Dashboard の履歴">📈</a>
-      <a class="btn secondary" href="https://hanazonomental.com/" target="_blank" rel="noopener" title="病院のホームページ" aria-label="病院のホームページ">🏥</a>
-      <a class="btn secondary" href="https://takeout.google.com" target="_blank" rel="noopener" title="Google Takeout" aria-label="Google Takeout">📦</a>
+      <a class="btn secondary" href="https://dashboard.exercise.quest/history" target="_blank" rel="noopener" title="Exercise Dashboard の履歴" data-label="📈 Exercise Dashboard の履歴を開く" aria-label="Exercise Dashboard の履歴">📈</a>
+      <a class="btn secondary" href="https://hanazonomental.com/" target="_blank" rel="noopener" title="病院のホームページ" data-label="🏥 病院のホームページ" aria-label="病院のホームページ">🏥</a>
+      <a class="btn secondary" href="https://takeout.google.com" target="_blank" rel="noopener" title="Google Takeout" data-label="📦 Google Takeout" aria-label="Google Takeout">📦</a>
     </div>
     <div class="import-row">
       <label class="btn secondary csv-import-label" title="CSVインポート（Sleep Score / Steps 自動判別）">📥<input type="file" id="csvInput" accept=".csv"></label>
-      <button class="btn secondary" id="saveChartImageBtn" title="グラフを画像保存" aria-label="グラフを画像保存">🖼️</button>
+      <button class="btn secondary" id="saveChartImageBtn" data-label="🖼 グラフを画像保存" title="グラフを画像保存" aria-label="グラフを画像保存">🖼️</button>
     </div>
     <div class="hint">CSVは date/day/timestamp 列 と overall_score(睡眠スコア)/steps 列から、睡眠か歩数かを自動判別します。</div>
   </div>
@@ -410,8 +415,8 @@
   <div class="lightbox-toolbar">
     <span class="lightbox-counter" id="lightboxCounter"></span>
     <div style="display:flex; gap:6px;">
-      <a class="btn secondary" id="lightboxDownload" download title="ダウンロード" aria-label="ダウンロード">⬇️</a>
-      <button type="button" class="btn secondary" id="lightboxCloseBtn" title="閉じる" aria-label="閉じる">✕</button>
+      <a class="btn secondary" id="lightboxDownload" data-label="⬇ ダウンロード" download title="ダウンロード" aria-label="ダウンロード">⬇️</a>
+      <button type="button" class="btn secondary" id="lightboxCloseBtn" data-label="閉じる" title="閉じる" aria-label="閉じる">✕</button>
     </div>
   </div>
   <div class="lightbox-body">
@@ -1369,7 +1374,8 @@ function copyToClipboard(text, btn) {
   navigator.clipboard.writeText(text || '').then(() => {
     const original = btn.textContent;
     btn.textContent = '✓';
-    setTimeout(() => { btn.textContent = original; }, 1500);
+    btn.classList.add('done');
+    setTimeout(() => { btn.textContent = original; btn.classList.remove('done'); }, 1500);
   });
 }
 
