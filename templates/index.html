@@ -167,7 +167,6 @@
   body.view-mode .jump-row,
   body.view-mode .entry-delete,
   body.view-mode #historyBtn,
-  body.view-mode #combineImagesBtn,
   body.view-mode #saveStatus,
   body.view-mode #contentEdit,
   body.view-mode .import-row .csv-import-label,
@@ -318,7 +317,7 @@
     <div class="card">
       <div class="jump-row">
         <input type="date" id="jumpDateInput">
-        <button class="btn" id="jumpBtn">開く/新規</button>
+        <button class="btn" id="jumpBtn" title="開く/新規" aria-label="開く/新規">📂</button>
       </div>
       <div class="entry-list" id="entryList"></div>
     </div>
@@ -332,14 +331,13 @@
       </div>
       <div class="head-actions">
         <button class="btn secondary" id="guestLinkBtn" title="24時間公開URLをコピー" aria-label="24時間公開URLをコピー" hidden>🔗</button>
-        <button class="btn secondary copy-btn" id="copyBtn">メモをコピー</button>
+        <button class="btn secondary copy-btn" id="copyBtn" title="メモをコピー" aria-label="メモをコピー">📋</button>
       </div>
     </div>
 
     <div class="editor-toolbar">
       <div class="group">
-        <button class="btn secondary" id="historyBtn">🕘 編集履歴</button>
-        <button class="btn secondary" id="combineImagesBtn">🖼 画像を結合保存</button>
+        <button class="btn secondary" id="historyBtn" title="編集履歴" aria-label="編集履歴">🕘</button>
       </div>
     </div>
     <div class="editor-split">
@@ -354,9 +352,9 @@
     <div class="vitals-toolbar">
       <h2 style="margin:0;">📊 バイタル（睡眠・歩数）</h2>
       <div class="period-toggle ui-fade">
-        <button class="btn secondary" data-mode="recent">直近30日</button>
-        <button class="btn secondary" data-mode="week">週次</button>
-        <button class="btn secondary" data-mode="month">月次</button>
+        <button class="btn secondary" data-mode="recent" title="直近30日" aria-label="直近30日">📅</button>
+        <button class="btn secondary" data-mode="week" title="週次" aria-label="週次">🗓️</button>
+        <button class="btn secondary" data-mode="month" title="月次" aria-label="月次">🈷️</button>
       </div>
     </div>
     <div id="chartsContainer">
@@ -369,17 +367,17 @@
         <input type="date" id="medStart" required>
         <span>〜</span>
         <input type="date" id="medEnd" title="空欄なら継続中">
-        <button type="submit" class="btn secondary">服薬を追加</button>
+        <button type="submit" class="btn secondary" title="服薬を追加" aria-label="服薬を追加">➕</button>
       </form>
     </div>
     <div class="external-link-row">
-      <a class="btn secondary" href="https://dashboard.exercise.quest/history" target="_blank" rel="noopener">📈 Exercise Dashboard の履歴を開く</a>
-      <a class="btn secondary" href="https://hanazonomental.com/" target="_blank" rel="noopener">🏥 病院のホームページ</a>
-      <a class="btn secondary" href="https://takeout.google.com" target="_blank" rel="noopener">📦 Google Takeout</a>
+      <a class="btn secondary" href="https://dashboard.exercise.quest/history" target="_blank" rel="noopener" title="Exercise Dashboard の履歴" aria-label="Exercise Dashboard の履歴">📈</a>
+      <a class="btn secondary" href="https://hanazonomental.com/" target="_blank" rel="noopener" title="病院のホームページ" aria-label="病院のホームページ">🏥</a>
+      <a class="btn secondary" href="https://takeout.google.com" target="_blank" rel="noopener" title="Google Takeout" aria-label="Google Takeout">📦</a>
     </div>
     <div class="import-row">
-      <label class="btn secondary csv-import-label">CSVインポート（Sleep Score / Steps 自動判別）<input type="file" id="csvInput" accept=".csv"></label>
-      <button class="btn secondary" id="saveChartImageBtn">🖼 グラフを画像保存</button>
+      <label class="btn secondary csv-import-label" title="CSVインポート（Sleep Score / Steps 自動判別）">📥<input type="file" id="csvInput" accept=".csv"></label>
+      <button class="btn secondary" id="saveChartImageBtn" title="グラフを画像保存" aria-label="グラフを画像保存">🖼️</button>
     </div>
     <div class="hint">CSVは date/day/timestamp 列 と overall_score(睡眠スコア)/steps 列から、睡眠か歩数かを自動判別します。</div>
   </div>
@@ -391,7 +389,7 @@
 <dialog id="historyDialog" class="history-dialog">
   <div class="history-head">
     <h2 style="margin:0;">🕘 編集履歴</h2>
-    <button type="button" class="btn secondary" id="historyCloseBtn">閉じる</button>
+    <button type="button" class="btn secondary" id="historyCloseBtn" title="閉じる" aria-label="閉じる">✕</button>
   </div>
   <div id="historyBody">
     <div class="history-slider-row">
@@ -403,7 +401,7 @@
     </div>
     <div id="historyPreview" class="history-preview"></div>
     <div class="history-actions">
-      <button type="button" class="btn secondary" id="historyRestoreBtn">この内容を復元</button>
+      <button type="button" class="btn secondary" id="historyRestoreBtn" title="この内容を復元" aria-label="この内容を復元">↩️</button>
     </div>
   </div>
 </dialog>
@@ -412,8 +410,8 @@
   <div class="lightbox-toolbar">
     <span class="lightbox-counter" id="lightboxCounter"></span>
     <div style="display:flex; gap:6px;">
-      <a class="btn secondary" id="lightboxDownload" download>⬇ ダウンロード</a>
-      <button type="button" class="btn secondary" id="lightboxCloseBtn">閉じる</button>
+      <a class="btn secondary" id="lightboxDownload" download title="ダウンロード" aria-label="ダウンロード">⬇️</a>
+      <button type="button" class="btn secondary" id="lightboxCloseBtn" title="閉じる" aria-label="閉じる">✕</button>
     </div>
   </div>
   <div class="lightbox-body">
@@ -1233,73 +1231,6 @@ document.getElementById('historyCloseBtn').addEventListener('click', () => {
 });
 
 // ---------------------------------------------------------------------
-// Combine markdown-embedded images into one vertical PNG
-// ---------------------------------------------------------------------
-
-function extractImageUrls(markdown) {
-  const urls = [];
-  const re = /!\[[^\]]*\]\(\s*(\S+?)(?:\s+"[^"]*")?\s*\)/g;
-  let match;
-  while ((match = re.exec(markdown))) urls.push(match[1]);
-  return urls;
-}
-
-function loadImage(url) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error(url));
-    img.src = url;
-  });
-}
-
-document.getElementById('combineImagesBtn').addEventListener('click', async () => {
-  const urls = extractImageUrls(document.getElementById('contentEdit').value);
-  if (!urls.length) {
-    alert('本文に画像（![alt](URL) 形式）が見つかりませんでした。');
-    return;
-  }
-
-  let images;
-  try {
-    images = await Promise.all(urls.map(loadImage));
-  } catch (e) {
-    alert('画像の読み込みに失敗しました: ' + e.message);
-    return;
-  }
-
-  const width = Math.max(...images.map(img => img.naturalWidth));
-  let y = 0;
-  const placed = images.map(img => {
-    const scale = width / img.naturalWidth;
-    const h = img.naturalHeight * scale;
-    const top = y;
-    y += h;
-    return { img, h, top };
-  });
-
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = Math.max(1, Math.round(y));
-  const ctx = canvas.getContext('2d');
-  placed.forEach(({ img, h, top }) => ctx.drawImage(img, 0, top, width, h));
-
-  let dataUrl;
-  try {
-    dataUrl = canvas.toDataURL('image/png');
-  } catch (e) {
-    alert('画像の結合に失敗しました（外部画像のセキュリティ制限の可能性があります）: ' + e.message);
-    return;
-  }
-
-  const link = document.createElement('a');
-  link.download = `memo_images_${state.selectedDate}.png`;
-  link.href = dataUrl;
-  link.click();
-});
-
-// ---------------------------------------------------------------------
 // Charts
 // ---------------------------------------------------------------------
 
@@ -1437,7 +1368,7 @@ document.getElementById('csvInput').addEventListener('change', e => importCsv(e.
 function copyToClipboard(text, btn) {
   navigator.clipboard.writeText(text || '').then(() => {
     const original = btn.textContent;
-    btn.textContent = 'コピーしました ✓';
+    btn.textContent = '✓';
     setTimeout(() => { btn.textContent = original; }, 1500);
   });
 }
