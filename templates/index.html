@@ -316,6 +316,7 @@
 </div>
 <span id="statusBadge"></span>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<button type="button" class="reveal-cover" id="revealBtn">📋 メモをコピーして表示</button>
 
 <div class="app">
   <div class="left fade-on-editor-focus">
@@ -387,7 +388,6 @@
     <div class="hint">CSVは date/day/timestamp 列 と overall_score(睡眠スコア)/steps 列から、睡眠か歩数かを自動判別します。</div>
   </div>
 </div>
-    <button type="button" class="reveal-cover" id="revealBtn">📋 メモをコピーして表示</button>
   </div>
 </div>
 
@@ -823,6 +823,7 @@ function loadEditorForSelectedDate() {
 // button copies the text, then lifts the blur. Re-applied for every entry.
 function setCovered(on) {
   document.getElementById('editorCard').classList.toggle('covered', on);
+  document.body.classList.toggle('is-covered', on);
 }
 document.getElementById('revealBtn').addEventListener('click', () => {
   const text = document.getElementById('contentEdit').value;
@@ -831,9 +832,11 @@ document.getElementById('revealBtn').addEventListener('click', () => {
   const reveal = () => {
     btn.textContent = 'コピーしました！';
     card.classList.add('revealing', 'copied-reveal');
+    document.body.classList.add('is-revealing');
     setTimeout(() => {
       setCovered(false);
       card.classList.remove('revealing');
+      document.body.classList.remove('is-revealing');
       btn.textContent = '📋 メモをコピーして表示';
     }, 900);
   };
