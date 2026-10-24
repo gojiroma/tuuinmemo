@@ -11,8 +11,6 @@
 <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <style>
   .app {
     display: grid;
@@ -174,7 +172,6 @@
   body.view-mode #historyBtn,
   body.view-mode #saveStatus,
   body.view-mode #contentEdit,
-  body.view-mode .import-row .csv-import-label,
   body.view-mode .external-link-row,
   body.view-mode .hint { display: none; }
   body.view-mode .editor-split { grid-template-columns: 1fr; }
@@ -191,15 +188,8 @@
   .med-form input[type=text] { flex: 1 1 140px; min-width: 0; }
   body.view-mode .med-form, body.view-mode .med-chip button { display: none; }
   .vitals-card { max-width: none; }
-  .vitals-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
-  .chart-box { height: 440px; position: relative; }
-  #chartsContainer { background: var(--bg-elevated); padding: 8px; border-radius: var(--radius-sm); transition: background var(--t); }
   .external-link-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
   .external-link-row a.btn { text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
-  .import-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-  .import-row label.btn { display: inline-block; }
-  .import-row input[type=file] { display: none; }
-  #saveChartImageBtn { margin-left: auto; }
 
   /* Edit history dialog -------------------------------------------- */
   .history-dialog {
@@ -355,17 +345,6 @@
     </div>
 <div class="vitals-section">
   <div class="card vitals-card">
-    <div class="vitals-toolbar">
-      <h2 style="margin:0;">📊 バイタル（睡眠・歩数）</h2>
-      <div class="period-toggle ui-fade">
-        <button class="btn secondary" data-mode="recent" data-label="直近30日" title="直近30日" aria-label="直近30日">📅</button>
-        <button class="btn secondary" data-mode="week" data-label="週次" title="週次" aria-label="週次">🗓️</button>
-        <button class="btn secondary" data-mode="month" data-label="月次" title="月次" aria-label="月次">🈷️</button>
-      </div>
-    </div>
-    <div id="chartsContainer">
-      <div class="chart-box"><canvas id="vitalsChart"></canvas></div>
-    </div>
     <div class="med-area">
       <div class="med-list" id="medList"></div>
       <form class="med-form" id="medForm">
@@ -381,11 +360,6 @@
       <a class="btn secondary" href="https://hanazonomental.com/" target="_blank" rel="noopener" title="病院のホームページ" data-label="🏥 病院のホームページ" aria-label="病院のホームページ">🏥</a>
       <a class="btn secondary" href="https://takeout.google.com" target="_blank" rel="noopener" title="Google Takeout" data-label="📦 Google Takeout" aria-label="Google Takeout">📦</a>
     </div>
-    <div class="import-row">
-      <label class="btn secondary csv-import-label" title="CSVインポート（Sleep Score / Steps 自動判別）">📥<input type="file" id="csvInput" accept=".csv"></label>
-      <button class="btn secondary" id="saveChartImageBtn" data-label="🖼 グラフを画像保存" title="グラフを画像保存" aria-label="グラフを画像保存">🖼️</button>
-    </div>
-    <div class="hint">CSVは date/day/timestamp 列 と overall_score(睡眠スコア)/steps 列から、睡眠か歩数かを自動判別します。</div>
   </div>
 </div>
   </div>
@@ -429,26 +403,29 @@
 <footer>通院メモ &middot; データは Neon PostgreSQL に保存されます</footer>
 
 <script src="{{ url_for('static', filename='idle-ui.js') }}"></script>
-<script src="{{ url_for('static', filename='vitals-chart.js') }}"></script>
 <script src="{{ url_for('static', filename='markdown-editor.js') }}"></script>
 <script>
 const WEEKDAY_JA = ['日', '月', '火', '水', '木', '金', '土'];
 
 const state = {
-  selectedDate: VitalsChart.fmtDate(new Date()),
+  selectedDate: fmtDate(new Date()),
   entries: [],
   entriesByDate: {},
-  vitals: { sleep: [], steps: [] },
-  vitalsMode: 'recent',
   meds: [],
   currentMemoId: null,
   role: null, // 'admin' | 'guest', set once the access token is verified
 };
 
-let vitalsChart;
-
-function fmtDate(d) { return VitalsChart.fmtDate(d); }
-function addDays(dateStr, n) { return VitalsChart.addDays(dateStr, n); }
+function fmtDate(d) {
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return fmtDate(d);
+}
 
 function weekdayLabel(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
@@ -644,9 +621,6 @@ async function loadEntries() {
     setStatus('オフライン（キャッシュ表示）', true);
   }
   renderEntryList();
-  // loadVitals() runs concurrently and may resolve first — re-render so the
-  // clinic-day highlight isn't stuck reflecting an empty entry list.
-  renderCharts();
 }
 
 function setStatus(text, offline) {
@@ -778,7 +752,7 @@ function selectDate(dateStr) {
   if (dateStr === state.selectedDate) return; // already showing it
 
   if (autosaveTimer) {
-    // A chart hover can switch the shown entry before the debounce fires —
+    // Selecting another entry can switch the shown entry before the debounce fires —
     // flush whatever was just typed under the old date first so it isn't
     // silently dropped.
     clearTimeout(autosaveTimer);
@@ -1075,9 +1049,6 @@ async function autosaveNow() {
     clearDraft(dateStr);
     setSaveStatus('保存しました ✓', 'saved');
     renderEntryList();
-    // Only a brand-new date adds a clinic-day marker; redrawing on every
-    // autosave would flicker the chart while typing.
-    if (isNewDate) renderCharts();
   } catch (e) {
     saveDraft(dateStr, payload);
     setSaveStatus('オフラインのため下書き保存しました', 'offline');
@@ -1115,7 +1086,6 @@ async function deleteEntry(dateStr) {
   }
 
   renderEntryList();
-  renderCharts();
 }
 
 // ---------------------------------------------------------------------
@@ -1238,42 +1208,7 @@ document.getElementById('historyCloseBtn').addEventListener('click', () => {
   document.getElementById('historyDialog').close();
 });
 
-// ---------------------------------------------------------------------
-// Charts
-// ---------------------------------------------------------------------
-
-function renderCharts() {
-  // Guarded so that a charting failure (e.g. Chart.js CDN hiccup) can't
-  // break the callers that also load entries/the editor in the same flow.
-  try {
-    vitalsChart = VitalsChart.renderVitalsChart(
-      document.getElementById('vitalsChart'),
-      vitalsChart,
-      state.entries,
-      state.vitals,
-      state.vitalsMode,
-      memo => selectDate(memo.date), // hovering a clinic day loads it into the editor
-      state.meds
-    );
-  } catch (e) {
-    console.warn('renderCharts failed', e);
-  }
-}
-
-async function loadVitals() {
-  const { start, end } = VitalsChart.vitalsRangeForMode(state.vitalsMode);
-  const cacheK = `cache:vitals:${state.vitalsMode}`;
-  try {
-    const vitals = await apiGet(`/api/vitals?start=${start}&end=${end}`);
-    state.vitals = vitals;
-    localStorage.setItem(cacheK, JSON.stringify(vitals));
-  } catch (e) {
-    state.vitals = JSON.parse(localStorage.getItem(cacheK) || '{"sleep":[],"steps":[]}');
-  }
-  renderCharts();
-}
-
-// Medication periods (name + start/end), plotted as lanes under the chart.
+// Medication periods (name + start/end), listed under the memo.
 function renderMedList() {
   const list = document.getElementById('medList');
   list.innerHTML = '';
@@ -1304,7 +1239,6 @@ async function loadMeds() {
     state.meds = JSON.parse(localStorage.getItem('cache:meds') || '[]');
   }
   renderMedList();
-  renderCharts();
 }
 
 document.getElementById('medForm').addEventListener('submit', async (e) => {
@@ -1328,47 +1262,6 @@ document.getElementById('medForm').addEventListener('submit', async (e) => {
   }
 });
 
-document.querySelectorAll('.period-toggle [data-mode]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    state.vitalsMode = btn.dataset.mode;
-    document.querySelectorAll('.period-toggle [data-mode]').forEach(b => b.classList.toggle('active', b === btn));
-    loadVitals();
-  loadMeds();
-  });
-});
-
-document.getElementById('saveChartImageBtn').addEventListener('click', () => {
-  html2canvas(document.getElementById('chartsContainer')).then(canvas => {
-    const link = document.createElement('a');
-    link.download = `vitals_${state.vitalsMode}_${fmtDate(new Date())}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-  });
-});
-
-// ---------------------------------------------------------------------
-// CSV import
-// ---------------------------------------------------------------------
-
-async function importCsv(inputEl) {
-  const file = inputEl.files[0];
-  if (!file) return;
-  const form = new FormData();
-  form.append('file', file);
-  try {
-    const res = await fetch('/api/vitals/import-csv', { method: 'POST', headers: authHeaders(), body: form });
-    const result = await res.json();
-    if (!res.ok) throw new Error(result.error || 'import failed');
-    alert(`${result.type === 'steps' ? '歩数' : '睡眠スコア'}を${result.imported}件インポートしました（既存の日付は上書き。形式エラーで${result.skipped}件スキップ）`);
-    loadVitals();
-  } catch (e) {
-    alert('インポートに失敗しました: ' + e.message);
-  }
-  inputEl.value = '';
-}
-
-document.getElementById('csvInput').addEventListener('change', e => importCsv(e.target));
-
 // ---------------------------------------------------------------------
 // Mode toggle (edit <-> doctor-facing read-only view, same page/URL)
 // ---------------------------------------------------------------------
@@ -1391,7 +1284,7 @@ function toggleMode() {
   const viewMode = document.body.classList.toggle('view-mode');
   if (viewMode) setCovered(!!document.getElementById('contentEdit').value.trim());
   if (!viewMode) {
-    document.getElementById('jumpDateInput').value = VitalsChart.fmtDate(new Date());
+    document.getElementById('jumpDateInput').value = fmtDate(new Date());
     state.selectedDate = document.getElementById('jumpDateInput').value;
     loadEditorForSelectedDate();
   }
@@ -1426,7 +1319,6 @@ if ('serviceWorker' in navigator) {
 }
 
 function startApp() {
-  document.querySelector('.period-toggle [data-mode="recent"]').classList.add('active');
   document.getElementById('jumpDateInput').value = state.selectedDate;
   setStatus(navigator.onLine ? 'オンライン' : 'オフライン', !navigator.onLine);
 
@@ -1441,7 +1333,7 @@ function startApp() {
     loadEditorForSelectedDate();
     if (navigator.onLine) syncPendingDrafts();
   });
-  loadVitals();
+  loadMeds();
 }
 
 tryUnlockWithStoredToken().then(unlocked => {

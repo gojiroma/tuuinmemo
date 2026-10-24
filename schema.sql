@@ -17,29 +17,6 @@ CREATE TABLE IF NOT EXISTS memos (
 CREATE INDEX IF NOT EXISTS idx_memos_date ON memos (date);
 CREATE INDEX IF NOT EXISTS idx_memos_clinic_day ON memos (is_clinic_day) WHERE is_clinic_day;
 
--- 睡眠データ（CSVインポート、1日1件）
-CREATE TABLE IF NOT EXISTS sleep_data (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    date date NOT NULL UNIQUE,
-    duration integer,   -- 分単位（レガシー。新規インポートは score を使用）
-    score integer        -- 睡眠スコア（0-100、CSVの overall_score 列）
-);
-
--- 既存DBへの追従（CREATE TABLE IF NOT EXISTS は既存テーブルには効かないため）
-ALTER TABLE sleep_data ADD COLUMN IF NOT EXISTS score integer;
-ALTER TABLE sleep_data ALTER COLUMN duration DROP NOT NULL;
-
-CREATE INDEX IF NOT EXISTS idx_sleep_data_date ON sleep_data (date);
-
--- 歩数データ（CSVインポート、1日1件）
-CREATE TABLE IF NOT EXISTS steps_data (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    date date NOT NULL UNIQUE,
-    steps integer NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_steps_data_date ON steps_data (date);
-
 -- メモ編集履歴（十分な間隔を空けた上書き時にだけ直前バージョンをスナップショット）
 CREATE TABLE IF NOT EXISTS memo_history (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

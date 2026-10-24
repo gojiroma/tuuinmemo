@@ -162,7 +162,6 @@ header .nav-link:hover { background: var(--accent-dim); }
 .btn.active { background: var(--accent); color: #fff; }
 .btn:disabled { opacity: 0.5; cursor: default; }
 
-.period-toggle { display: flex; gap: 6px; }
 
 input[type=text], input[type=date], input[type=search], textarea {
   width: 100%;

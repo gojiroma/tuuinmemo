@@ -1,6 +1,4 @@
-import csv
 import hmac
-import io
 import os
 import re
 import secrets
@@ -44,10 +42,10 @@ def classify_token(token):
 
 
 def require_access(admin_only=False):
-    # Gates the memo/vitals content behind a shared secret so the (unauthenticated,
+    # Gates the memo content behind a shared secret so the (unauthenticated,
     # private-URL) app doesn't expose content to anyone who merely has the link.
-    # The token travels as the X-Access-Token header, or ?token= for the CSV
-    # import form/file download style requests that can't set headers.
+    # The token travels as the X-Access-Token header, or ?token= for
+    # requests that can't set headers.
     def decorator(view):
         @wraps(view)
         def wrapped(*args, **kwargs):
@@ -399,7 +397,7 @@ def revoke_guest_link(link_id):
 
 
 # ---------------------------------------------------------------------------
-# Medications (name + period, plotted under the vitals chart)
+# Medications (name + period)
 # ---------------------------------------------------------------------------
 
 def row_to_medication(row):
@@ -500,259 +498,6 @@ def save_search_history():
         conn.commit()
 
     return jsonify({"ok": True}), 201
-
-
-# ---------------------------------------------------------------------------
-# Vitals endpoints
-# ---------------------------------------------------------------------------
-
-@app.route("/api/vitals", methods=["GET"])
-@require_access()
-def get_vitals():
-    end = request.args.get("end") or date.today().isoformat()
-    start = request.args.get("start") or (date.fromisoformat(end) - timedelta(days=29)).isoformat()
-
-    where = "WHERE date BETWEEN %s AND %s"
-    params = (start, end)
-
-    with get_conn() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(f"SELECT date, duration, score FROM sleep_data {where} ORDER BY date", params)
-            sleep_rows = cur.fetchall()
-            cur.execute(f"SELECT date, steps FROM steps_data {where} ORDER BY date", params)
-            steps_rows = cur.fetchall()
-
-    return jsonify({
-        "sleep": [
-            {"date": r["date"].isoformat(), "duration": r["duration"], "score": r["score"]}
-            for r in sleep_rows
-        ],
-        "steps": [{"date": r["date"].isoformat(), "steps": r["steps"]} for r in steps_rows],
-    })
-
-
-# --- manual entries UI + API (追加) ---
-
-@app.route("/manual")
-@require_access(admin_only=True)
-def manual_page():
-    return render_template("manual_entries.html")
-
-@app.route("/api/manual/steps", methods=["POST"])
-@require_access(admin_only=True)
-def manual_steps():
-    data = request.get_json(force=True, silent=True) or {}
-    entries = data.get("entries", [])
-    if not isinstance(entries, list) or not entries:
-        return jsonify({"error": "entries must be a non-empty list"}), 400
-
-    rows = []
-    errors = []
-    for i, e in enumerate(entries):
-        d = e.get("date")
-        try:
-            # validate date
-            date.fromisoformat(d)
-        except Exception:
-            errors.append({"index": i, "error": "invalid date", "date": d})
-            continue
-        try:
-            steps = int(e.get("steps") or 0)
-            if steps < 0:
-                raise ValueError()
-        except Exception:
-            errors.append({"index": i, "error": "invalid steps", "steps": e.get("steps")})
-            continue
-        rows.append((d, steps))
-
-    if not rows:
-        return jsonify({"ok": False, "errors": errors}), 400
-
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            psycopg2.extras.execute_values(
-                cur,
-                """
-                INSERT INTO steps_data (date, steps) VALUES %s
-                ON CONFLICT (date) DO UPDATE SET steps = EXCLUDED.steps
-                """,
-                rows,
-            )
-        conn.commit()
-    return jsonify({"ok": True, "imported": len(rows), "errors": errors, "message": "歩数データを保存しました"})
-
-@app.route("/api/manual/sleep", methods=["POST"])
-@require_access(admin_only=True)
-def manual_sleep():
-    data = request.get_json(force=True, silent=True) or {}
-    entries = data.get("entries", [])
-    if not isinstance(entries, list) or not entries:
-        return jsonify({"error": "entries must be a non-empty list"}), 400
-
-    rows_duration = []  # date, duration
-    rows_score = []     # date, score
-    errors = []
-    for i, e in enumerate(entries):
-        d = e.get("date")
-        try:
-            date.fromisoformat(d)
-        except Exception:
-            errors.append({"index": i, "error": "invalid date", "date": d})
-            continue
-        duration = e.get("duration")
-        score = e.get("score")
-        used = False
-        if duration not in (None, ''):
-            try:
-                dur = int(duration)
-                rows_duration.append((d, dur))
-                used = True
-            except Exception:
-                errors.append({"index": i, "error": "invalid duration", "duration": duration})
-                continue
-        if score not in (None, ''):
-            try:
-                sc = int(score)
-                rows_score.append((d, sc))
-                used = True
-            except Exception:
-                errors.append({"index": i, "error": "invalid score", "score": score})
-                continue
-        if not used:
-            errors.append({"index": i, "error": "no duration or score provided"})
-    if not rows_duration and not rows_score:
-        return jsonify({"ok": False, "errors": errors}), 400
-
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            if rows_duration:
-                psycopg2.extras.execute_values(
-                    cur,
-                    """
-                    INSERT INTO sleep_data (date, duration) VALUES %s
-                    ON CONFLICT (date) DO UPDATE SET duration = EXCLUDED.duration
-                    """,
-                    rows_duration,
-                )
-            if rows_score:
-                psycopg2.extras.execute_values(
-                    cur,
-                    """
-                    INSERT INTO sleep_data (date, score) VALUES %s
-                    ON CONFLICT (date) DO UPDATE SET score = EXCLUDED.score
-                    """,
-                    rows_score,
-                )
-        conn.commit()
-    return jsonify({"ok": True, "imported_duration": len(rows_duration), "imported_score": len(rows_score), "errors": errors, "message": "睡眠データを保存しました"})
-
-# ---------------------------------------------------------------------------
-# DATE_KEYS = ("date", "day", "timestamp", "日付")
-DATE_KEYS = ("date", "day", "timestamp", "日付")
-SCORE_KEYS = ("overall_score", "sleep_score", "score", "スコア")
-DURATION_KEYS = ("duration", "minutes", "sleep", "分", "睡眠時間")
-STEPS_KEYS = ("steps", "step", "歩数")
-
-
-def find_key(fieldnames, candidates):
-    lowered = [(f, f.strip().lower()) for f in fieldnames if f]
-    for cand in candidates:
-        for original, low in lowered:
-            if cand in low:
-                return original
-    return None
-
-
-def parse_date_cell(value):
-    value = value.strip()
-    if "T" in value:  # ISO timestamp (e.g. 2026-08-26T06:34:30Z) -> date part only
-        value = value.split("T", 1)[0]
-    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y", "%Y%m%d"):
-        try:
-            return datetime.strptime(value, fmt).date().isoformat()
-        except ValueError:
-            continue
-    raise ValueError(f"unrecognized date format: {value}")
-
-
-@app.route("/api/vitals/import-csv", methods=["POST"])
-@require_access(admin_only=True)
-def import_vitals_csv():
-    data_type = request.form.get("type") or request.args.get("type") or "auto"
-    if data_type not in ("auto", "sleep", "steps"):
-        return jsonify({"error": "type must be 'auto', 'sleep' or 'steps'"}), 400
-
-    file = request.files.get("file")
-    if not file:
-        return jsonify({"error": "file is required"}), 400
-
-    text = file.read().decode("utf-8-sig")
-    reader = csv.DictReader(io.StringIO(text))
-    if not reader.fieldnames:
-        return jsonify({"error": "empty CSV"}), 400
-
-    date_key = find_key(reader.fieldnames, DATE_KEYS)
-
-    if data_type == "auto":
-        # Sleep Score CSVs carry a score column; Steps CSVs a steps column.
-        # If both (or neither) show up, the file name breaks the tie.
-        has_sleep = bool(find_key(reader.fieldnames, SCORE_KEYS) or find_key(reader.fieldnames, DURATION_KEYS))
-        has_steps = bool(find_key(reader.fieldnames, STEPS_KEYS))
-        name = (file.filename or "").lower()
-        if has_sleep != has_steps:
-            data_type = "sleep" if has_sleep else "steps"
-        elif "step" in name:
-            data_type = "steps"
-        elif "sleep" in name:
-            data_type = "sleep"
-        else:
-            return jsonify({"error": "could not tell Sleep Score from Steps", "found_columns": reader.fieldnames}), 400
-
-    if data_type == "sleep":
-        col = "score"
-        value_key = find_key(reader.fieldnames, SCORE_KEYS)
-        if not value_key:  # fall back to old duration-based CSV exports
-            col = "duration"
-            value_key = find_key(reader.fieldnames, DURATION_KEYS)
-    else:
-        col = "steps"
-        value_key = find_key(reader.fieldnames, STEPS_KEYS)
-
-    if not date_key or not value_key:
-        return jsonify({
-            "error": "could not detect columns",
-            "found_columns": reader.fieldnames,
-        }), 400
-
-    by_date = {}
-    errors = []
-    for i, r in enumerate(reader, start=2):
-        try:
-            d = parse_date_cell(r[date_key])
-            v = int(re.sub(r"[^\d-]", "", r[value_key]))
-            by_date[d] = v  # a day can have multiple source rows (e.g. naps); last one wins
-        except (ValueError, KeyError, TypeError) as e:
-            errors.append(f"row {i}: {e}")
-
-    rows = list(by_date.items())
-    if not rows:
-        return jsonify({"error": "no valid rows", "details": errors}), 400
-
-    table = "sleep_data" if data_type == "sleep" else "steps_data"
-
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            psycopg2.extras.execute_values(
-                cur,
-                f"""
-                INSERT INTO {table} (date, {col}) VALUES %s
-                ON CONFLICT (date) DO UPDATE SET {col} = EXCLUDED.{col}
-                """,
-                rows,
-            )
-        conn.commit()
-
-    return jsonify({"type": data_type, "imported": len(rows), "skipped": len(errors), "errors": errors[:20]})
 
 
 @app.route("/api/health", methods=["GET"])

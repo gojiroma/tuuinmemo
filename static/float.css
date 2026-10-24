@@ -136,7 +136,7 @@ body:not(.view-mode) > .app { --card-w: 1180px; }
   .left { grid-row: 2; opacity: 1; }
 }
 
-/* Vitals chart: sits at the bottom of the editor card, after the body ---- */
+/* Medication / links panel: sits at the bottom of the editor card ---- */
 .vitals-section { margin-top: 8px; }
 .vitals-card {
   width: 100%;
@@ -144,10 +144,6 @@ body:not(.view-mode) > .app { --card-w: 1180px; }
   background: var(--glass-strong);
   border: 1px solid var(--glass-edge);
   box-shadow: none;
-}
-#chartsContainer { background: transparent; }
-@media (max-width: 860px) {
-  .chart-box { height: 56vh; }
 }
 
 @media (prefers-reduced-motion: reduce) {
