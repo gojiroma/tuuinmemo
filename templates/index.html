@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>通院メモ</title>
-<meta name="theme-color" content="#fffdfa" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#2b2119" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f2f2f0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1b1b" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
 <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
 <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
@@ -26,41 +26,17 @@
     .app { grid-template-columns: 1fr; }
   }
 
-  /* Entry list -------------------------------------------------- */
-  .jump-row { display: flex; gap: 6px; margin-bottom: 12px; }
-  .jump-row input[type=date] { flex: 1; }
-  .entry-list {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    margin: -2px;
-    padding: 2px;
-  }
-  .entry-row {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    border-radius: var(--radius-sm);
-    border: 1px solid transparent;
-    transition: background var(--t-fast), border-color var(--t-fast);
-  }
-  .entry-row:hover { background: var(--accent-dim); }
-  .entry-row.selected { border-color: var(--accent-soft); background: var(--accent-dim); }
-  .entry-main { flex: 1; min-width: 0; cursor: pointer; padding: 8px 4px 8px 10px; }
-  .entry-top { display: flex; align-items: baseline; gap: 7px; }
-  .entry-date { font-size: 0.85rem; font-weight: 600; }
-  .entry-weekday { font-size: 0.72rem; color: var(--text-faint); }
-  .entry-ago { margin-left: auto; font-size: 0.72rem; color: var(--text-faint); }
-  .entry-summary {
-    font-size: 0.78rem;
-    color: var(--text-dim);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    margin-top: 2px;
-  }
+  /* Older memos, listed below the latest one ------------------- */
+  .jump-row { display: flex; gap: 6px; }
+  .archive { display: flex; flex-direction: column; margin-top: 28px; }
+  .archive-entry { border-top: 1px solid var(--border); padding: 22px 0 10px; }
+  .archive-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+  .archive-date { font-size: 1.05rem; font-weight: 600; }
+  .archive-weekday, .archive-ago { font-size: 0.8rem; color: var(--text-faint); }
+  .archive-ago { margin-left: auto; }
+  body:not(.view-mode) .archive-date { cursor: pointer; }
+  body:not(.view-mode) .archive-date:hover { text-decoration: underline; }
   .entry-delete {
-    flex-shrink: 0;
     border: none;
     background: transparent;
     color: var(--text-faint);
@@ -69,13 +45,8 @@
     height: 30px;
     border-radius: var(--radius-sm);
     cursor: pointer;
-    opacity: 0;
-    transition: opacity var(--t-fast), background var(--t-fast), color var(--t-fast);
   }
-  .entry-row:hover .entry-delete,
-  .entry-row:focus-within .entry-delete { opacity: 1; }
   .entry-delete:hover { background: var(--danger-dim); color: var(--danger); }
-  .entry-empty { font-size: 0.82rem; color: var(--text-dim); padding: 8px 4px; }
 
   /* Editor card --------------------------------------------------- */
   .editor-card { display: flex; flex-direction: column; gap: 12px; }
@@ -123,9 +94,10 @@
     background: var(--bg-elevated);
     transition: background var(--t), border-color var(--t);
   }
-  #contentView h2 { font-size: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
-  #contentView :first-child { margin-top: 0; }
-  #contentView img {
+  #contentView h2, .memo-body h2 { font-size: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+  #contentView :first-child, .memo-body :first-child { margin-top: 0; }
+  .memo-body { line-height: 1.65; }
+  #contentView img, .memo-body img {
     display: block;
     max-width: 100%;
     max-height: 220px;
@@ -134,15 +106,15 @@
     cursor: zoom-in;
     transition: opacity var(--t-fast);
   }
-  #contentView .img-frame {
+  #contentView .img-frame, .memo-body .img-frame {
     display: inline-block;
     vertical-align: top;
     max-width: 100%;
     margin: 8px 8px 8px 0;
     position: relative;
   }
-  #contentView .img-frame:hover img { opacity: 0.85; }
-  #contentView .img-hint {
+  #contentView .img-frame:hover img, .memo-body .img-frame:hover img { opacity: 0.85; }
+  #contentView .img-hint, .memo-body .img-hint {
     position: absolute;
     inset: 0;
     display: flex;
@@ -157,7 +129,7 @@
     transition: opacity var(--t-fast);
     pointer-events: none;
   }
-  #contentView .img-frame:hover .img-hint { opacity: 1; }
+  #contentView .img-frame:hover .img-hint, .memo-body .img-frame:hover .img-hint { opacity: 1; }
   .status-row { display: flex; justify-content: flex-end; align-items: center; }
   #saveStatus { font-size: 0.78rem; color: var(--text-faint); transition: color var(--t); min-height: 1em; }
   #saveStatus.saved { color: var(--success); }
@@ -167,29 +139,15 @@
 
   /* View mode: doctor-facing read-only view of the same page, toggled
      in place instead of navigating to a separate page/URL. */
-  body.view-mode .jump-row,
+  body.view-mode .editor-toolbar,
   body.view-mode .entry-delete,
   body.view-mode #historyBtn,
   body.view-mode #saveStatus,
   body.view-mode #contentEdit,
-  body.view-mode .external-link-row,
   body.view-mode .hint { display: none; }
   body.view-mode .editor-split { grid-template-columns: 1fr; }
   body.view-mode #contentView { max-height: none; }
   body.view-mode .copy-btn { display: inline-block; }
-
-  /* Vitals section ------------------------------------------------ */
-  .vitals-section { padding: 0; }
-  .med-area { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
-  .med-list { display: flex; flex-wrap: wrap; gap: 6px; }
-  .med-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-dim); padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border-soft); }
-  .med-chip button { border: none; background: transparent; color: var(--text-faint); cursor: pointer; padding: 0; }
-  .med-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .med-form input[type=text] { flex: 1 1 140px; min-width: 0; }
-  body.view-mode .med-form, body.view-mode .med-chip button { display: none; }
-  .vitals-card { max-width: none; }
-  .external-link-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-  .external-link-row a.btn { text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
 
   /* Edit history dialog -------------------------------------------- */
   .history-dialog {
@@ -289,8 +247,7 @@
   .auth-gate-card h2 { margin: 0; font-size: 1.05rem; }
   .auth-gate-card input[type=password] { width: 100%; }
   .auth-gate-error { font-size: 0.8rem; color: var(--danger); min-height: 1em; }
-  body.auth-locked .app,
-  body.auth-locked .vitals-section { display: none; }
+  body.auth-locked .app { display: none; }
 
 </style>
 <link rel="stylesheet" href="{{ url_for('static', filename='float.css') }}">
@@ -309,16 +266,6 @@
 <button type="button" class="reveal-cover" id="revealBtn">📋 メモをコピーして表示</button>
 
 <div class="app">
-  <div class="left fade-on-editor-focus">
-    <div class="card">
-      <div class="jump-row">
-        <input type="date" id="jumpDateInput">
-        <button class="btn" id="jumpBtn" title="開く/新規" aria-label="開く/新規">📂</button>
-      </div>
-      <div class="entry-list" id="entryList"></div>
-    </div>
-  </div>
-
   <div class="card editor-card" id="editorCard">
     <div class="editor-head">
       <div class="date-label-group">
@@ -333,6 +280,10 @@
 
     <div class="editor-toolbar">
       <div class="group">
+        <div class="jump-row">
+          <input type="date" id="jumpDateInput">
+          <button class="btn" id="jumpBtn" title="開く/新規" aria-label="開く/新規">📂</button>
+        </div>
         <button class="btn secondary" id="historyBtn" title="編集履歴" aria-label="編集履歴">🕘</button>
       </div>
     </div>
@@ -343,26 +294,9 @@
     <div class="status-row">
       <span id="saveStatus"></span>
     </div>
-<div class="vitals-section">
-  <div class="card vitals-card">
-    <div class="med-area">
-      <div class="med-list" id="medList"></div>
-      <form class="med-form" id="medForm">
-        <input type="text" id="medName" placeholder="薬の名前" required>
-        <input type="date" id="medStart" required>
-        <span>〜</span>
-        <input type="date" id="medEnd" title="空欄なら継続中">
-        <button type="submit" class="btn secondary" title="服薬を追加" aria-label="服薬を追加">➕</button>
-      </form>
-    </div>
-    <div class="external-link-row">
-      <a class="btn secondary" href="https://dashboard.exercise.quest/history" target="_blank" rel="noopener" title="Exercise Dashboard の履歴" data-label="📈 Exercise Dashboard の履歴を開く" aria-label="Exercise Dashboard の履歴">📈</a>
-      <a class="btn secondary" href="https://hanazonomental.com/" target="_blank" rel="noopener" title="病院のホームページ" data-label="🏥 病院のホームページ" aria-label="病院のホームページ">🏥</a>
-      <a class="btn secondary" href="https://takeout.google.com" target="_blank" rel="noopener" title="Google Takeout" data-label="📦 Google Takeout" aria-label="Google Takeout">📦</a>
-    </div>
   </div>
-</div>
-  </div>
+
+  <div class="archive" id="archive"></div>
 </div>
 
 <dialog id="historyDialog" class="history-dialog">
@@ -411,7 +345,6 @@ const state = {
   selectedDate: fmtDate(new Date()),
   entries: [],
   entriesByDate: {},
-  meds: [],
   currentMemoId: null,
   role: null, // 'admin' | 'guest', set once the access token is verified
 };
@@ -420,11 +353,6 @@ function fmtDate(d) {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${d.getFullYear()}-${m}-${day}`;
-}
-function addDays(dateStr, n) {
-  const d = new Date(dateStr + 'T00:00:00');
-  d.setDate(d.getDate() + n);
-  return fmtDate(d);
 }
 
 function weekdayLabel(dateStr) {
@@ -620,7 +548,7 @@ async function loadEntries() {
     cached.forEach(m => { state.entriesByDate[m.date] = m; });
     setStatus('オフライン（キャッシュ表示）', true);
   }
-  renderEntryList();
+  renderArchive();
 }
 
 function setStatus(text, offline) {
@@ -675,84 +603,70 @@ window.addEventListener('online', () => { setStatus('オンライン', false); s
 window.addEventListener('offline', () => setStatus('オフライン', true));
 
 // ---------------------------------------------------------------------
-// Entry list
+// Older memos: every entry except the one on top, newest first, rendered
+// read-only below it on the same page.
 // ---------------------------------------------------------------------
 
-function renderEntryList() {
-  const list = document.getElementById('entryList');
-  list.innerHTML = '';
-
-  if (!state.entries.length) {
-    list.innerHTML = '<div class="entry-empty">まだエントリがありません。日付を選んで作成してください。</div>';
-    return;
-  }
-
-  const visible = state.entries;
-  const today = fmtDate(new Date());
-
-  visible.forEach(m => {
-    const row = document.createElement('div');
-    row.className = 'entry-row';
-    if (m.date === state.selectedDate) row.classList.add('selected');
-
-    const main = document.createElement('div');
-    main.className = 'entry-main';
-    main.addEventListener('click', () => selectDate(m.date));
-
-    const top = document.createElement('div');
-    top.className = 'entry-top';
-
-    const dateSpan = document.createElement('span');
-    dateSpan.className = 'entry-date';
-    dateSpan.textContent = m.date;
-    top.appendChild(dateSpan);
-
-    const wdSpan = document.createElement('span');
-    wdSpan.className = 'entry-weekday';
-    wdSpan.textContent = weekdayLabel(m.date);
-    top.appendChild(wdSpan);
-
-    const days = Math.round((new Date(today + 'T00:00:00') - new Date(m.date + 'T00:00:00')) / 86400000);
-    const agoSpan = document.createElement('span');
-    agoSpan.className = 'entry-ago';
-    agoSpan.textContent = days === 0 ? '今日' : days > 0 ? `${days}日前` : `${-days}日後`;
-    top.appendChild(agoSpan);
-    main.appendChild(top);
-
-    const preview = document.createElement('div');
-    preview.className = 'entry-summary';
-    preview.textContent = firstLine(m.content) || '（内容なし）';
-    main.appendChild(preview);
-
-    row.appendChild(main);
-
-    const delBtn = document.createElement('button');
-    delBtn.className = 'entry-delete';
-    delBtn.type = 'button';
-    delBtn.setAttribute('aria-label', `${m.date} のメモを削除`);
-    delBtn.textContent = '🗑';
-    delBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      deleteEntry(m.date);
-    });
-    row.appendChild(delBtn);
-
-    list.appendChild(row);
-  });
+function agoLabel(dateStr) {
+  const today = new Date(fmtDate(new Date()) + 'T00:00:00');
+  const days = Math.round((today - new Date(dateStr + 'T00:00:00')) / 86400000);
+  return days === 0 ? '今日' : days > 0 ? `${days}日前` : `${-days}日後`;
 }
 
-function flashJumpHighlight() {
-  const card = document.getElementById('editorCard');
-  card.classList.remove('jump-highlight');
-  void card.offsetWidth; // restart animation
-  card.classList.add('jump-highlight');
+function renderArchive() {
+  const archive = document.getElementById('archive');
+  archive.innerHTML = '';
+
+  state.entries
+    .filter(m => m.date !== state.selectedDate)
+    .forEach(m => {
+      const section = document.createElement('section');
+      section.className = 'archive-entry';
+
+      const head = document.createElement('div');
+      head.className = 'archive-head';
+
+      const dateSpan = document.createElement('span');
+      dateSpan.className = 'archive-date';
+      dateSpan.textContent = m.date;
+      dateSpan.addEventListener('click', () => {
+        if (!document.body.classList.contains('view-mode')) selectDate(m.date);
+      });
+      head.appendChild(dateSpan);
+
+      const wdSpan = document.createElement('span');
+      wdSpan.className = 'archive-weekday';
+      wdSpan.textContent = `(${weekdayLabel(m.date)})`;
+      head.appendChild(wdSpan);
+
+      const agoSpan = document.createElement('span');
+      agoSpan.className = 'archive-ago';
+      agoSpan.textContent = agoLabel(m.date);
+      head.appendChild(agoSpan);
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'entry-delete';
+      delBtn.type = 'button';
+      delBtn.setAttribute('aria-label', `${m.date} のメモを削除`);
+      delBtn.textContent = '🗑';
+      delBtn.addEventListener('click', () => deleteEntry(m.date));
+      head.appendChild(delBtn);
+      section.appendChild(head);
+
+      const body = document.createElement('div');
+      body.className = 'memo-body';
+      renderMarkdown(body, m.content);
+      section.appendChild(body);
+
+      archive.appendChild(section);
+    });
 }
 
 function selectDate(dateStr) {
   if (dateStr === state.selectedDate) return; // already showing it
 
   if (autosaveTimer) {
-    // Selecting another entry can switch the shown entry before the debounce fires —
+    // Switching the entry on top can happen before the debounce fires —
     // flush whatever was just typed under the old date first so it isn't
     // silently dropped.
     clearTimeout(autosaveTimer);
@@ -760,19 +674,12 @@ function selectDate(dateStr) {
     autosaveNow();
   }
 
-  const dir = dateStr > state.selectedDate ? 1 : -1; // newer enters from the right
   state.selectedDate = dateStr;
   document.getElementById('jumpDateInput').value = dateStr;
-  renderEntryList();
+  renderArchive();
   loadEditorForSelectedDate();
   setCovered(false);
-  const card = document.getElementById('editorCard');
-  if (card.animate && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    card.animate(
-      [{ opacity: 0, transform: `translateX(${dir * 48}px) scale(0.985)` }, { opacity: 1, transform: 'none' }],
-      { duration: 320, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
-    );
-  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function loadEditorForSelectedDate() {
@@ -793,8 +700,8 @@ function loadEditorForSelectedDate() {
   setCovered(!!(base.content || '').trim());
 }
 
-// View mode keeps the memo blurred until it has been copied: the cover
-// button copies the text, then lifts the blur. Re-applied for every entry.
+// View mode keeps the memos blurred until the latest one has been copied:
+// the cover button copies the text, then lifts the blur.
 function setCovered(on) {
   document.getElementById('editorCard').classList.toggle('covered', on);
   document.body.classList.toggle('is-covered', on);
@@ -818,51 +725,6 @@ document.getElementById('revealBtn').addEventListener('click', () => {
   try { navigator.clipboard.writeText(text).then(reveal, reveal); } catch (e) { reveal(); }
 });
 
-// ---------------------------------------------------------------------
-// Page-turning: ←/→ or swipe step through entries by date.
-// Works from the selected date, so an unsaved (new) date is a valid spot.
-// ---------------------------------------------------------------------
-
-function stepDate(dir) { // dir: -1 = older, +1 = newer
-  const dates = state.entries.map(m => m.date).sort();
-  const cur = state.selectedDate;
-  const next = dir > 0 ? dates.find(d => d > cur) : [...dates].reverse().find(d => d < cur);
-  return next || null;
-}
-
-function turnPage(dir) {
-  const d = stepDate(dir);
-  if (d) selectDate(d);
-}
-
-document.addEventListener('keydown', (e) => {
-  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-  if (e.ctrlKey || e.metaKey || e.shiftKey) return;
-  if (document.querySelector('dialog[open]')) return;
-  const t = e.target;
-  const typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
-  if (typing && !e.altKey) return; // plain arrows belong to the caret while typing
-  e.preventDefault();
-  turnPage(e.key === 'ArrowLeft' ? -1 : 1);
-});
-
-(() => {
-  const card = document.getElementById('editorCard');
-  let sx = 0, sy = 0, tracking = false;
-  card.addEventListener('touchstart', (e) => {
-    const t = e.target;
-    tracking = e.touches.length === 1 && !/^(TEXTAREA|INPUT|CANVAS)$/.test(t.tagName);
-    sx = e.touches[0].clientX; sy = e.touches[0].clientY;
-  }, { passive: true });
-  card.addEventListener('touchend', (e) => {
-    if (!tracking) return;
-    tracking = false;
-    const dx = e.changedTouches[0].clientX - sx;
-    const dy = e.changedTouches[0].clientY - sy;
-    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) turnPage(dx > 0 ? -1 : 1);
-  }, { passive: true });
-})();
-
 document.getElementById('jumpBtn').addEventListener('click', () => {
   const v = document.getElementById('jumpDateInput').value;
   if (v) selectDate(v);
@@ -872,18 +734,21 @@ document.getElementById('jumpBtn').addEventListener('click', () => {
 // Editor
 // ---------------------------------------------------------------------
 
-function updatePreview() {
-  const content = document.getElementById('contentEdit').value;
-  document.getElementById('contentView').innerHTML = content.trim()
+function renderMarkdown(el, content) {
+  el.innerHTML = (content || '').trim()
     ? marked.parse(content)
     : '<p style="color:var(--text-faint);">（内容なし）</p>';
-  decorateContentImages();
+  decorateContentImages(el);
+}
+
+function updatePreview() {
+  renderMarkdown(document.getElementById('contentView'), document.getElementById('contentEdit').value);
 }
 
 // Wrap each preview image in a frame that shows a "クリックして拡大" hint
 // on hover, so it's clear the (shrunk) thumbnail opens a full-size lightbox.
-function decorateContentImages() {
-  document.getElementById('contentView').querySelectorAll('img').forEach(img => {
+function decorateContentImages(el) {
+  el.querySelectorAll('img').forEach(img => {
     const frame = document.createElement('span');
     frame.className = 'img-frame';
     img.replaceWith(frame);
@@ -968,10 +833,10 @@ function openLightbox(urls, index) {
   document.getElementById('imageLightbox').showModal();
 }
 
-document.getElementById('contentView').addEventListener('click', (e) => {
-  const clicked = e.target.closest('img');
+document.querySelector('.app').addEventListener('click', (e) => {
+  const clicked = e.target.closest('#contentView img, .memo-body img');
   if (!clicked) return;
-  const imgs = Array.from(document.getElementById('contentView').querySelectorAll('img'));
+  const imgs = Array.from(clicked.closest('#contentView, .memo-body').querySelectorAll('img'));
   openLightbox(imgs.map(img => img.src), imgs.indexOf(clicked));
 });
 
@@ -1048,7 +913,7 @@ async function autosaveNow() {
     state.currentMemoId = memo.id;
     clearDraft(dateStr);
     setSaveStatus('保存しました ✓', 'saved');
-    renderEntryList();
+    renderArchive();
   } catch (e) {
     saveDraft(dateStr, payload);
     setSaveStatus('オフラインのため下書き保存しました', 'offline');
@@ -1085,7 +950,7 @@ async function deleteEntry(dateStr) {
     updatePreview();
   }
 
-  renderEntryList();
+  renderArchive();
 }
 
 // ---------------------------------------------------------------------
@@ -1208,60 +1073,6 @@ document.getElementById('historyCloseBtn').addEventListener('click', () => {
   document.getElementById('historyDialog').close();
 });
 
-// Medication periods (name + start/end), listed under the memo.
-function renderMedList() {
-  const list = document.getElementById('medList');
-  list.innerHTML = '';
-  state.meds.forEach(m => {
-    const chip = document.createElement('span');
-    chip.className = 'med-chip';
-    chip.append(`${m.name} ${m.start_date}〜${m.end_date || '継続中'}`);
-    const del = document.createElement('button');
-    del.type = 'button';
-    del.textContent = '✕';
-    del.setAttribute('aria-label', `${m.name} を削除`);
-    del.addEventListener('click', async () => {
-      try {
-        await fetch(`/api/medications/${m.id}`, { method: 'DELETE', headers: authHeaders() });
-        await loadMeds();
-      } catch (e) { alert('削除に失敗しました'); }
-    });
-    chip.appendChild(del);
-    list.appendChild(chip);
-  });
-}
-
-async function loadMeds() {
-  try {
-    state.meds = await apiGet('/api/medications');
-    localStorage.setItem('cache:meds', JSON.stringify(state.meds));
-  } catch (e) {
-    state.meds = JSON.parse(localStorage.getItem('cache:meds') || '[]');
-  }
-  renderMedList();
-}
-
-document.getElementById('medForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const body = {
-    name: document.getElementById('medName').value.trim(),
-    start_date: document.getElementById('medStart').value,
-    end_date: document.getElementById('medEnd').value || null,
-  };
-  try {
-    const res = await fetch('/api/medications', {
-      method: 'POST',
-      headers: authHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error((await res.json()).error || res.status);
-    e.target.reset();
-    await loadMeds();
-  } catch (err) {
-    alert('追加に失敗しました: ' + err.message);
-  }
-});
-
 // ---------------------------------------------------------------------
 // Mode toggle (edit <-> doctor-facing read-only view, same page/URL)
 // ---------------------------------------------------------------------
@@ -1282,12 +1093,12 @@ document.getElementById('copyBtn').addEventListener('click', function () {
 function toggleMode() {
   if (state.role !== 'admin') return;
   const viewMode = document.body.classList.toggle('view-mode');
-  if (viewMode) setCovered(!!document.getElementById('contentEdit').value.trim());
-  if (!viewMode) {
-    document.getElementById('jumpDateInput').value = fmtDate(new Date());
-    state.selectedDate = document.getElementById('jumpDateInput').value;
-    loadEditorForSelectedDate();
-  }
+  // View mode puts the latest memo on top; edit mode opens today's.
+  const latest = state.entries.length ? state.entries[0].date : fmtDate(new Date());
+  state.selectedDate = viewMode ? latest : fmtDate(new Date());
+  document.getElementById('jumpDateInput').value = state.selectedDate;
+  renderArchive();
+  loadEditorForSelectedDate();
 }
 
 document.getElementById('guestLinkBtn').addEventListener('click', copyGuestLink);
@@ -1329,11 +1140,10 @@ function startApp() {
       state.selectedDate = state.entries[0].date;
       document.getElementById('jumpDateInput').value = state.selectedDate;
     }
-    renderEntryList();
+    renderArchive();
     loadEditorForSelectedDate();
     if (navigator.onLine) syncPendingDrafts();
   });
-  loadMeds();
 }
 
 tryUnlockWithStoredToken().then(unlocked => {

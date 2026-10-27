@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tuuinmemo-shell-v6';
+const CACHE_NAME = 'tuuinmemo-shell-v7';
 const SHELL_FILES = [
   '/',
   '/static/manifest.json',
