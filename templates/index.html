@@ -294,6 +294,7 @@
           <button class="btn" id="jumpBtn" title="開く/新規" aria-label="開く/新規">📂</button>
         </div>
         <button class="btn secondary" id="historyBtn" title="編集履歴" aria-label="編集履歴">🕘</button>
+        <button class="btn secondary" id="viewOnlyBtn" title="閲覧のみ表示（eキーで戻る）" aria-label="閲覧のみ表示">👁</button>
       </div>
     </div>
     <div class="editor-split">
@@ -1122,6 +1123,7 @@ function toggleMode() {
 }
 
 document.getElementById('guestLinkBtn').addEventListener('click', copyGuestLink);
+document.getElementById('viewOnlyBtn').addEventListener('click', toggleMode);
 
 // e: switch edit/view mode, l: copy a 24h guest link. Escape leaves the
 // textarea so the keys work again.
