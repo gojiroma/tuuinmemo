@@ -244,6 +244,7 @@
   }
   .auth-gate[hidden] { display: none; }
   .auth-gate-card { width: min(360px, 90vw); display: flex; flex-direction: column; gap: 12px; }
+  .auth-gate-card[hidden] { display: none; }
   .auth-gate-card h2 { margin: 0; font-size: 1.05rem; }
   .auth-gate-card input[type=password] { width: 100%; }
   .auth-gate-error { font-size: 0.8rem; color: var(--danger); min-height: 1em; }
@@ -260,7 +261,15 @@
     <button type="submit" class="btn">開く</button>
     <div class="auth-gate-error" id="authGateError"></div>
   </form>
+  <div class="card auth-gate-card" id="guestGateNotice" hidden>
+    <h2 id="guestGateMessage"></h2>
+  </div>
 </div>
+<script>
+  // Opened from a share link: the token comes with the URL, so never flash
+  // the token prompt while it is being checked.
+  if (new URLSearchParams(location.search).has('guest')) document.getElementById('authGate').hidden = true;
+</script>
 <span id="statusBadge"></span>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <button type="button" class="reveal-cover" id="revealBtn">📋 メモをコピーして表示</button>
@@ -400,8 +409,17 @@ function applyRoleToUI(role) {
 
 function unlockApp(role) {
   applyRoleToUI(role);
+  if (role) localStorage.setItem('accessRole', role);
   document.body.classList.remove('auth-locked');
   document.getElementById('authGate').hidden = true;
+}
+
+// Share-link visitors never get the token prompt; they see a plain notice.
+function showGuestGateNotice(message) {
+  document.getElementById('authGateForm').hidden = true;
+  document.getElementById('guestGateMessage').textContent = message;
+  document.getElementById('guestGateNotice').hidden = false;
+  document.getElementById('authGate').hidden = false;
 }
 
 // A guest opens a URL like https://.../?guest=<token>; adopt that token as
@@ -419,6 +437,7 @@ function consumeGuestUrlToken() {
 async function tryUnlockWithStoredToken() {
   const guestToken = consumeGuestUrlToken();
   if (guestToken) setToken(guestToken);
+  const isGuest = !!guestToken || localStorage.getItem('accessRole') === 'guest';
 
   if (!getToken()) return false;
   try {
@@ -433,9 +452,10 @@ async function tryUnlockWithStoredToken() {
       // accepts - most likely a revoked/expired guest link. Drop it instead
       // of getting stuck retrying it silently on every load.
       localStorage.removeItem('accessToken');
-      if (guestToken) {
-        document.getElementById('authGateError').textContent = 'この一時URLは期限切れか無効になっています。';
-      }
+      localStorage.removeItem('accessRole');
+      if (isGuest) showGuestGateNotice('この共有リンクは期限切れか無効になっています。');
+    } else if (isGuest) {
+      showGuestGateNotice('読み込みに失敗しました。再読み込みしてください。');
     }
   } catch (e) {
     // offline with a previously-verified token: let the app's own
@@ -1149,7 +1169,7 @@ function startApp() {
 tryUnlockWithStoredToken().then(unlocked => {
   if (unlocked) {
     startApp();
-  } else {
+  } else if (document.getElementById('guestGateNotice').hidden) {
     document.getElementById('authTokenInput').focus();
   }
 });
