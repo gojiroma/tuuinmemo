@@ -72,6 +72,8 @@
   body.view-mode [data-label].done::after { content: 'コピーしました ✓'; }
   .head-actions { display: flex; gap: 6px; align-items: center; }
   #guestLinkBtn[hidden] { display: none; }
+  #editBackBtn { display: none; }
+  body.view-mode.is-admin #editBackBtn { display: inline-block; }
   .copy-btn { display: none; font-size: 0.78rem; padding: 5px 12px; }
   body:not(.view-mode) .copy-btn { display: inline-block; }
   body.view-mode .copy-btn { display: inline-block; }
@@ -283,6 +285,7 @@
       </div>
       <div class="head-actions">
         <button class="btn secondary" id="guestLinkBtn" data-label="🔗 24時間公開URLをコピー" title="24時間公開URLをコピー" aria-label="24時間公開URLをコピー" hidden>🔗</button>
+        <button class="btn secondary" id="editBackBtn" data-label="✏️ 編集に戻る" title="編集に戻る" aria-label="編集に戻る">✏️</button>
         <button class="btn secondary copy-btn" id="copyBtn" data-label="メモをコピー" title="メモをコピー" aria-label="メモをコピー">📋</button>
       </div>
     </div>
@@ -403,6 +406,7 @@ function applyRoleToUI(role) {
     document.body.classList.add('view-mode');
   } else if (role === 'admin') {
     document.body.classList.remove('view-mode');
+    document.body.classList.add('is-admin');
     document.getElementById('guestLinkBtn').hidden = false;
     prepareGuestLink();
   }
@@ -1120,10 +1124,14 @@ function toggleMode() {
   document.getElementById('jumpDateInput').value = state.selectedDate;
   renderArchive();
   loadEditorForSelectedDate();
+  // The admin's own read-only view shows the memo right away; only share-link
+  // visitors get the copy-to-reveal cover.
+  setCovered(false);
 }
 
 document.getElementById('guestLinkBtn').addEventListener('click', copyGuestLink);
 document.getElementById('viewOnlyBtn').addEventListener('click', toggleMode);
+document.getElementById('editBackBtn').addEventListener('click', toggleMode);
 
 // e: switch edit/view mode, l: copy a 24h guest link. Escape leaves the
 // textarea so the keys work again.
