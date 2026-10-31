@@ -410,6 +410,72 @@ def activate_guest_link(link_id):
     return jsonify(row_to_guest_link(row))
 
 
+# Short share code: shown on the patient's screen (with a QR code) so the
+# doctor can open the memo on their own device without the link being sent
+# through another service. Single-use, valid for a few minutes, and swapped
+# for the link's real token on redemption.
+SHARE_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"  # no 0/O, 1/I/L
+SHARE_CODE_LENGTH = 8
+SHARE_CODE_MINUTES = 10
+
+
+def normalize_share_code(code):
+    return re.sub(r"[^A-Z0-9]", "", (code or "").upper())
+
+
+@app.route("/api/guest-links/share", methods=["POST"])
+@require_access(admin_only=True)
+def create_share_code():
+    token = secrets.token_urlsafe(24)
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(hours=GUEST_LINK_DEFAULT_HOURS)
+    code_expires_at = now + timedelta(minutes=SHARE_CODE_MINUTES)
+
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            for _ in range(5):  # retry on the (very unlikely) code collision
+                code = "".join(secrets.choice(SHARE_CODE_ALPHABET) for _ in range(SHARE_CODE_LENGTH))
+                cur.execute(
+                    "INSERT INTO guest_links (token, expires_at, short_code, short_code_expires_at) "
+                    "VALUES (%s, %s, %s, %s) ON CONFLICT (short_code) DO NOTHING RETURNING *",
+                    (token, expires_at, code, code_expires_at),
+                )
+                row = cur.fetchone()
+                if row:
+                    break
+        conn.commit()
+
+    if not row:
+        return jsonify({"error": "could not allocate a share code"}), 500
+    link = row_to_guest_link(row)
+    link["code"] = code
+    link["code_expires_at"] = code_expires_at.isoformat()
+    return jsonify(link), 201
+
+
+@app.route("/api/guest-links/redeem", methods=["POST"])
+def redeem_share_code():
+    data = request.get_json(force=True, silent=True) or {}
+    code = normalize_share_code(data.get("code"))
+    if len(code) != SHARE_CODE_LENGTH:
+        return jsonify({"error": "invalid code"}), 404
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE guest_links SET short_code = NULL, short_code_expires_at = NULL "
+                "WHERE short_code = %s AND short_code_expires_at > now() "
+                "AND revoked_at IS NULL AND expires_at > now() RETURNING token",
+                (code,),
+            )
+            row = cur.fetchone()
+        conn.commit()
+
+    if not row:
+        return jsonify({"error": "invalid or expired code"}), 404
+    return jsonify({"token": row[0]})
+
+
 @app.route("/api/guest-links/<link_id>", methods=["DELETE"])
 @require_access(admin_only=True)
 def revoke_guest_link(link_id):

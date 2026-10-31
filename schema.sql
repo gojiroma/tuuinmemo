@@ -52,6 +52,10 @@ CREATE TABLE IF NOT EXISTS guest_links (
 
 CREATE INDEX IF NOT EXISTS idx_guest_links_token ON guest_links (token);
 
+-- 主治医の端末で入力する短い共有コード（10分以内・1回だけ使える。使うとトークンと交換して消える）
+ALTER TABLE guest_links ADD COLUMN IF NOT EXISTS short_code text UNIQUE;
+ALTER TABLE guest_links ADD COLUMN IF NOT EXISTS short_code_expires_at timestamptz;
+
 -- 服薬期間（名前と開始日〜終了日。終了日が空なら継続中）
 CREATE TABLE IF NOT EXISTS memo_medications (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
