@@ -1,3 +1,4 @@
+import hashlib
 import hmac
 import os
 import re
@@ -13,6 +14,36 @@ app = Flask(__name__)
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN")
+
+_static_versions = {}
+
+
+@app.url_defaults
+def static_cache_buster(endpoint, values):
+    # Tag every static URL with a hash of the file's contents, so a deploy
+    # changes the URL and no browser or service-worker cache can serve the
+    # old file for the new page.
+    if endpoint != "static" or "filename" not in values:
+        return
+    filename = values["filename"]
+    if filename not in _static_versions:
+        try:
+            with open(os.path.join(app.static_folder, filename), "rb") as f:
+                _static_versions[filename] = hashlib.md5(f.read()).hexdigest()[:10]
+        except OSError:
+            _static_versions[filename] = None
+    if _static_versions[filename]:
+        values["v"] = _static_versions[filename]
+
+
+@app.after_request
+def no_cache_for_shell(response):
+    # The page and service worker must always be revalidated; otherwise a
+    # browser keeps opening an old version of the app.
+    if request.path in ("/", "/sw.js"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
+
 
 GUEST_LINK_DEFAULT_HOURS = 24
 GUEST_LINK_MAX_HOURS = 24 * 30  # 30 days

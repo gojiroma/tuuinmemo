@@ -1155,7 +1155,19 @@ document.addEventListener('keydown', (e) => {
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
+      .then(reg => reg.update())
+      .catch(() => {});
+  });
+  // A newer service worker took over (new deploy): reload once so the
+  // latest version of the app is what's on screen, unless mid-typing.
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloaded || autosaveTimer) return;
+    if (document.activeElement && document.activeElement.id === 'contentEdit') return;
+    reloaded = true;
+    location.reload();
   });
 }
 
