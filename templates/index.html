@@ -54,24 +54,13 @@
   .date-label-group { display: flex; align-items: baseline; gap: 8px; }
   .selected-date-label { font-weight: 700; font-size: 1.1rem; }
   .selected-date-weekday { font-size: 0.85rem; color: var(--text-dim); }
-  .toast {
-    position: fixed; left: 50%; bottom: 28px; z-index: 100;
-    transform: translate(-50%, 12px); opacity: 0; pointer-events: none;
-    padding: 10px 20px; border-radius: 999px;
-    background: var(--glass-strong); color: var(--accent);
-    border: 1px solid var(--glass-edge); box-shadow: var(--shadow-md);
-    -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
-    font-size: 0.9rem; font-weight: 600;
-    transition: opacity 0.25s, transform 0.25s;
-  }
-  .toast.show { opacity: 1; transform: translate(-50%, 0); }
   /* View mode keeps word labels; edit mode shows only the emoji. */
   body.view-mode [data-label] { font-size: 0; }
   body.view-mode [data-label]::after { content: attr(data-label); font-size: 0.84rem; }
   body.view-mode .copy-btn[data-label]::after { font-size: 0.78rem; }
   body.view-mode [data-label].done::after { content: 'コピーしました ✓'; }
   .head-actions { display: flex; gap: 6px; align-items: center; }
-  #guestLinkBtn[hidden], .share-pin[hidden] { display: none; }
+  .share-pin[hidden] { display: none; }
   .share-pin { font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; margin-right: 4px; }
   .share-pin strong { font-size: 1.15rem; letter-spacing: 0.15em; color: var(--text); font-family: ui-monospace, Menlo, monospace; }
   #sharePinTimer { color: var(--text-faint); font-size: 0.75rem; }
@@ -84,10 +73,13 @@
 
   .editor-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; }
   .editor-toolbar .group { display: flex; gap: 6px; flex-wrap: wrap; }
-  .editor-split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
-  @media (max-width: 860px) {
-    .editor-split { grid-template-columns: 1fr; }
-  }
+  /* Edit mode shows the memo as rendered; tapping it swaps in the
+     textarea, and leaving the textarea swaps the rendered view back. */
+  .editor-split { display: block; }
+  #contentEdit { display: none; }
+  .editor-card.editing #contentEdit { display: block; }
+  .editor-card.editing #contentView { display: none; }
+  body:not(.view-mode) #contentView { cursor: text; }
   #contentEdit { width: 100%; min-height: 640px; resize: vertical; line-height: 1.55; }
   #contentView {
     min-height: 640px;
@@ -147,54 +139,11 @@
      in place instead of navigating to a separate page/URL. */
   body.view-mode .editor-toolbar,
   body.view-mode .entry-delete,
-  body.view-mode #historyBtn,
   body.view-mode #saveStatus,
   body.view-mode #contentEdit,
   body.view-mode .hint { display: none; }
-  body.view-mode .editor-split { grid-template-columns: 1fr; }
   body.view-mode #contentView { max-height: none; }
   body.view-mode .copy-btn { display: inline-block; }
-
-  /* Edit history dialog -------------------------------------------- */
-  .history-dialog {
-    width: min(680px, 92vw);
-    max-height: 84vh;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
-    background: var(--card-bg);
-    color: var(--text);
-  }
-  /* Scoped to [open]: setting display here (rather than on the bare
-     .history-dialog selector) keeps the UA's dialog:not([open]) { display:
-     none } in effect while closed — an author display rule on the bare
-     selector would otherwise win and render the dialog inline on the page. */
-  .history-dialog[open] { display: flex; flex-direction: column; }
-  .history-dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
-  .history-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-  .history-slider-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
-  .history-slider-row input[type=range] { width: 100%; accent-color: var(--accent); }
-  .history-slider-label { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 0.8rem; }
-  .history-slider-time { font-weight: 600; }
-  .history-slider-position { color: var(--text-faint); flex-shrink: 0; }
-  .history-preview {
-    flex: 1;
-    overflow-y: auto;
-    min-height: 200px;
-    max-height: 50vh;
-    border: 1px solid var(--border-soft);
-    border-radius: var(--radius-sm);
-    padding: 8px 10px;
-    font-size: 0.85rem;
-    line-height: 1.65;
-    white-space: pre-wrap;
-    word-break: break-word;
-  }
-  .history-diff-line { display: block; padding: 1px 4px; border-radius: 4px; }
-  .history-diff-line.added { background: var(--success-dim); color: var(--success); }
-  .history-diff-line.removed { background: var(--danger-dim); color: var(--danger); text-decoration: line-through; }
-  .history-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
-  .history-empty { font-size: 0.82rem; color: var(--text-dim); padding: 8px 4px; }
 
   /* Image lightbox (click a preview image to view it full-size) ---- */
   .lightbox-dialog {
@@ -251,11 +200,8 @@
   .auth-gate[hidden] { display: none; }
   .auth-gate-card { width: min(360px, 90vw); display: flex; flex-direction: column; gap: 12px; }
   .auth-gate-card[hidden] { display: none; }
-  .auth-gate-card h2 { margin: 0; font-size: 1.05rem; }
-  .auth-gate-card input[type=password] { width: 100%; }
-  #authCodeInput { width: 100%; font-size: 1.6rem; letter-spacing: 0.4em; text-align: center; }
-  .auth-token-alt summary { font-size: 0.78rem; color: var(--text-faint); cursor: pointer; margin-bottom: 8px; }
-  .auth-gate-error { font-size: 0.8rem; color: var(--danger); min-height: 1em; }
+  #authInput { width: 100%; font-size: 1.6rem; letter-spacing: 0.3em; text-align: center; }
+  #authInput.invalid { border-color: var(--danger); }
   body.auth-locked .app { display: none; }
 
 </style>
@@ -264,26 +210,10 @@
 <body class="view-mode auth-locked">
 <div class="auth-gate" id="authGate">
   <form class="card auth-gate-card" id="authGateForm">
-    <h2>🔒 4桁のPINを入力してください</h2>
-    <input type="text" id="authCodeInput" placeholder="0000" inputmode="numeric" maxlength="4" autocomplete="off" spellcheck="false">
-    <details class="auth-token-alt">
-      <summary>アクセストークンで開く</summary>
-      <input type="password" id="authTokenInput" placeholder="トークンを入力" autocomplete="current-password">
-    </details>
-    <button type="submit" class="btn">開く</button>
-    <div class="auth-gate-error" id="authGateError"></div>
+    <input type="password" id="authInput" autocomplete="off" spellcheck="false" aria-label="PIN">
   </form>
-  <div class="card auth-gate-card" id="guestGateNotice" hidden>
-    <h2 id="guestGateMessage"></h2>
-  </div>
 </div>
-<script>
-  // Opened from a share link: the token comes with the URL, so never flash
-  // the token prompt while it is being checked.
-  if (new URLSearchParams(location.search).has('guest')) document.getElementById('authGate').hidden = true;
-</script>
 <span id="statusBadge"></span>
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
 <button type="button" class="reveal-cover" id="revealBtn">📋 メモをコピーして表示</button>
 
 <div class="app">
@@ -295,7 +225,6 @@
       </div>
       <div class="head-actions">
         <span class="share-pin" id="sharePin" title="主治医がパソコンでこのアプリを開いて入力するPIN" hidden>PIN <strong id="sharePinValue">----</strong> <span id="sharePinTimer"></span></span>
-        <button class="btn secondary" id="guestLinkBtn" data-label="🔗 24時間公開URLをコピー" title="24時間公開URLをコピー" aria-label="24時間公開URLをコピー" hidden>🔗</button>
         <button class="btn secondary" id="editBackBtn" data-label="✏️ 編集に戻る" title="編集に戻る" aria-label="編集に戻る">✏️</button>
         <button class="btn secondary copy-btn" id="copyBtn" data-label="メモをコピー" title="メモをコピー" aria-label="メモをコピー">📋</button>
       </div>
@@ -307,7 +236,6 @@
           <input type="date" id="jumpDateInput">
           <button class="btn" id="jumpBtn" title="開く/新規" aria-label="開く/新規">📂</button>
         </div>
-        <button class="btn secondary" id="historyBtn" title="編集履歴" aria-label="編集履歴">🕘</button>
         <button class="btn secondary" id="viewOnlyBtn" title="閲覧のみ表示（eキーで戻る）" aria-label="閲覧のみ表示">👁</button>
       </div>
     </div>
@@ -322,26 +250,6 @@
 
   <div class="archive" id="archive"></div>
 </div>
-
-<dialog id="historyDialog" class="history-dialog">
-  <div class="history-head">
-    <h2 style="margin:0;">🕘 編集履歴</h2>
-    <button type="button" class="btn secondary" id="historyCloseBtn" title="閉じる" aria-label="閉じる">✕</button>
-  </div>
-  <div id="historyBody">
-    <div class="history-slider-row">
-      <input type="range" id="historySlider" min="0" max="0" value="0" step="1">
-      <div class="history-slider-label">
-        <span class="history-slider-time" id="historySliderTime"></span>
-        <span class="history-slider-position" id="historySliderPosition"></span>
-      </div>
-    </div>
-    <div id="historyPreview" class="history-preview"></div>
-    <div class="history-actions">
-      <button type="button" class="btn secondary" id="historyRestoreBtn" title="この内容を復元" aria-label="この内容を復元">↩️</button>
-    </div>
-  </div>
-</dialog>
 
 <dialog id="imageLightbox" class="lightbox-dialog">
   <div class="lightbox-toolbar">
@@ -394,9 +302,9 @@ function firstLine(content) {
 // Access-token gate: nothing under /api/* is reachable without a token
 // (server-enforced in app.py), so the app is kept hidden client-side too
 // until a valid one is on hand. Two kinds of token exist:
-// - the admin's own ADMIN_TOKEN: full read/write, can issue guest links
-// - a guest link's token (from a ?guest=... URL an admin shared): read-only,
-//   locked into view mode, until the link expires or is revoked
+// - the admin's own ADMIN_TOKEN: full read/write
+// - a guest token, handed out for the 4-digit PIN shown on the admin's
+//   screen: read-only, locked into view mode, valid for 24 hours
 // ---------------------------------------------------------------------
 
 function getToken() { return localStorage.getItem('accessToken') || ''; }
@@ -418,10 +326,8 @@ function applyRoleToUI(role) {
   } else if (role === 'admin') {
     document.body.classList.remove('view-mode');
     document.body.classList.add('is-admin');
-    document.getElementById('guestLinkBtn').hidden = false;
     document.getElementById('sharePin').hidden = false;
     startSharePin();
-    prepareGuestLink();
   }
 }
 
@@ -432,31 +338,7 @@ function unlockApp(role) {
   document.getElementById('authGate').hidden = true;
 }
 
-// Share-link visitors never get the token prompt; they see a plain notice.
-function showGuestGateNotice(message) {
-  document.getElementById('authGateForm').hidden = true;
-  document.getElementById('guestGateMessage').textContent = message;
-  document.getElementById('guestGateNotice').hidden = false;
-  document.getElementById('authGate').hidden = false;
-}
-
-// A guest opens a URL like https://.../?guest=<token>; adopt that token as
-// this device's stored access token (once) and scrub it from the address
-// bar so it doesn't linger in history/screenshots.
-function consumeGuestUrlToken() {
-  const url = new URL(window.location.href);
-  const guestToken = url.searchParams.get('guest');
-  if (!guestToken) return null;
-  url.searchParams.delete('guest');
-  window.history.replaceState({}, '', url.pathname + url.search + url.hash);
-  return guestToken;
-}
-
 async function tryUnlockWithStoredToken() {
-  const guestToken = consumeGuestUrlToken();
-  if (guestToken) setToken(guestToken);
-  const isGuest = !!guestToken || localStorage.getItem('accessRole') === 'guest';
-
   if (!getToken()) return false;
   try {
     const res = await fetch('/api/auth/check', { headers: authHeaders() });
@@ -466,14 +348,10 @@ async function tryUnlockWithStoredToken() {
       return true;
     }
     if (res.status === 401) {
-      // A stored (or ?guest=... supplied) token that the server no longer
-      // accepts - most likely a revoked/expired guest link. Drop it instead
-      // of getting stuck retrying it silently on every load.
+      // A stored token the server no longer accepts (most likely an expired
+      // guest token): drop it so the gate asks again instead of retrying it.
       localStorage.removeItem('accessToken');
       localStorage.removeItem('accessRole');
-      if (isGuest) showGuestGateNotice('この共有リンクは期限切れか無効になっています。');
-    } else if (isGuest) {
-      showGuestGateNotice('読み込みに失敗しました。再読み込みしてください。');
     }
   } catch (e) {
     // offline with a previously-verified token: let the app's own
@@ -484,94 +362,48 @@ async function tryUnlockWithStoredToken() {
   return false;
 }
 
-document.getElementById('authGateForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const code = document.getElementById('authCodeInput').value.trim();
-  const errorEl = document.getElementById('authGateError');
-  let token = document.getElementById('authTokenInput').value.trim();
-  if (!code && !token) return;
+// One field for both: four digits is the PIN from the admin's screen
+// (swapped for a guest token), anything else is tried as a token itself.
+let authBusy = false;
 
-  errorEl.textContent = '';
+async function submitAuth() {
+  const input = document.getElementById('authInput');
+  const value = input.value.trim();
+  if (!value || authBusy) return;
+  authBusy = true;
   try {
-    if (code) {
-      // The PIN shown on the patient's screen: swap it for a guest token.
+    let token = value;
+    if (/^\d{4}$/.test(value)) {
       const redeem = await fetch('/api/share-pin/redeem', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: code }),
+        body: JSON.stringify({ pin: value }),
       });
-      if (!redeem.ok) {
-        errorEl.textContent = redeem.status === 404 ? 'PINが正しくないか、期限切れです（画面の最新のPINを入力してください）' : `サーバーエラー (${redeem.status})`;
-        return;
-      }
-      token = (await redeem.json()).token;
+      if (redeem.ok) token = (await redeem.json()).token;
     }
     const res = await fetch('/api/auth/check', { headers: { 'X-Access-Token': token } });
-    if (!res.ok) {
-      errorEl.textContent = res.status === 401 ? 'トークンが正しくありません' : `サーバーエラー (${res.status})`;
-      return;
-    }
+    if (!res.ok) throw new Error(res.status);
     const body = await res.json();
     setToken(token);
     unlockApp(body.role);
     startApp();
   } catch (e) {
-    errorEl.textContent = '通信に失敗しました';
+    // Keep what was typed: a token that happens to start with four digits
+    // just carries on being typed.
+    if (input.value.trim() === value) input.classList.add('invalid');
+  } finally {
+    authBusy = false;
   }
+}
+
+document.getElementById('authGateForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  submitAuth();
 });
-
-// ---------------------------------------------------------------------
-// Guest link (admin-only): a token is created ahead of time but only starts
-// its 24h window when "l" is pressed, which also copies the URL.
-// ---------------------------------------------------------------------
-
-let preparedGuestLink = null;
-
-async function prepareGuestLink() {
-  try {
-    const stored = JSON.parse(localStorage.getItem('preparedGuestLink') || 'null');
-    if (stored && stored.id && stored.token) { preparedGuestLink = stored; return; }
-  } catch (e) { /* fall through and create a fresh one */ }
-  try {
-    const res = await fetch('/api/guest-links', {
-      method: 'POST',
-      headers: authHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ pending: true }),
-    });
-    if (!res.ok) return;
-    const link = await res.json();
-    preparedGuestLink = { id: link.id, token: link.token };
-    localStorage.setItem('preparedGuestLink', JSON.stringify(preparedGuestLink));
-  } catch (e) { /* offline: retried on the next key press */ }
-}
-
-let toastTimer = null;
-function showToast(text) {
-  const el = document.getElementById('toast');
-  el.textContent = text;
-  el.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
-}
-
-async function copyGuestLink() {
-  if (state.role !== 'admin') return;
-  if (!preparedGuestLink) {
-    await prepareGuestLink();
-    if (!preparedGuestLink) { showToast('URLを用意できませんでした'); return; }
-  }
-  const link = preparedGuestLink;
-  preparedGuestLink = null;
-  localStorage.removeItem('preparedGuestLink');
-  navigator.clipboard.writeText(`${location.origin}/?guest=${encodeURIComponent(link.token)}`);
-  showToast('🔗 24時間公開URLをコピーしました');
-  const btn = document.getElementById('guestLinkBtn');
-  btn.textContent = '✓';
-  btn.title = 'コピーしました（24時間有効）';
-  setTimeout(() => { btn.textContent = '🔗'; btn.title = '24時間公開URLをコピー'; }, 1800);
-  fetch(`/api/guest-links/${link.id}/activate`, { method: 'POST', headers: authHeaders() })
-    .finally(prepareGuestLink);
-}
+document.getElementById('authInput').addEventListener('input', (e) => {
+  e.target.classList.remove('invalid');
+  if (/^\d{4}$/.test(e.target.value.trim())) submitAuth();
+});
 
 // ---------------------------------------------------------------------
 // Networking + offline cache
@@ -976,8 +808,36 @@ document.getElementById('contentEdit').addEventListener('input', updatePreview);
 document.getElementById('contentEdit').addEventListener('keydown', function (e) {
   applyMarkdownEditorKeydown(this, e);
 });
+document.getElementById('contentEdit').addEventListener('input', fitEditorHeight);
 document.getElementById('contentEdit').addEventListener('focus', () => document.body.classList.add('editor-focused'));
-document.getElementById('contentEdit').addEventListener('blur', () => document.body.classList.remove('editor-focused'));
+document.getElementById('contentEdit').addEventListener('blur', () => {
+  document.body.classList.remove('editor-focused');
+  document.getElementById('editorCard').classList.remove('editing');
+});
+
+function fitEditorHeight() {
+  const el = document.getElementById('contentEdit');
+  el.style.height = 'auto';
+  el.style.height = `${el.scrollHeight + 2}px`;
+}
+
+// Tapping anywhere outside the textarea leaves it (iOS doesn't always blur
+// on a tap on non-focusable content).
+document.addEventListener('pointerdown', (e) => {
+  const el = document.getElementById('contentEdit');
+  if (document.activeElement === el && e.target !== el) el.blur();
+});
+
+// Edit mode: tap the rendered memo to switch to the textarea (images still
+// open the lightbox instead).
+document.getElementById('contentView').addEventListener('click', (e) => {
+  if (document.body.classList.contains('view-mode') || e.target.closest('img, a')) return;
+  const el = document.getElementById('contentEdit');
+  document.getElementById('editorCard').classList.add('editing');
+  fitEditorHeight();
+  el.focus();
+  el.setSelectionRange(el.value.length, el.value.length);
+});
 
 async function deleteEntry(dateStr) {
   if (!confirm(`${dateStr} のメモを削除しますか？`)) return;
@@ -1005,126 +865,6 @@ async function deleteEntry(dateStr) {
 }
 
 // ---------------------------------------------------------------------
-// Edit history (server-side checkpoints, see app.py's upsert_memo)
-// ---------------------------------------------------------------------
-
-function formatHistoryTime(iso) {
-  const d = new Date(iso);
-  const dateStr = fmtDate(d);
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  return `${dateStr} ${hh}:${mm}`;
-}
-
-// Line-based diff (LCS) so the preview can show what was added/removed
-// versus the previous checkpoint, not just the raw text.
-function diffLines(oldText, newText) {
-  const oldLines = (oldText || '').split('\n');
-  const newLines = (newText || '').split('\n');
-  const n = oldLines.length, m = newLines.length;
-  const dp = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
-  for (let i = n - 1; i >= 0; i--) {
-    for (let j = m - 1; j >= 0; j--) {
-      dp[i][j] = oldLines[i] === newLines[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
-    }
-  }
-  const result = [];
-  let i = 0, j = 0;
-  while (i < n && j < m) {
-    if (oldLines[i] === newLines[j]) {
-      result.push({ type: 'same', text: oldLines[i] });
-      i++; j++;
-    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
-      result.push({ type: 'removed', text: oldLines[i] });
-      i++;
-    } else {
-      result.push({ type: 'added', text: newLines[j] });
-      j++;
-    }
-  }
-  while (i < n) { result.push({ type: 'removed', text: oldLines[i] }); i++; }
-  while (j < m) { result.push({ type: 'added', text: newLines[j] }); j++; }
-  return result;
-}
-
-let historyVersions = []; // oldest -> newest
-
-function showHistoryMessage(msg) {
-  document.getElementById('historySlider').closest('.history-slider-row').style.display = 'none';
-  document.getElementById('historyRestoreBtn').closest('.history-actions').style.display = 'none';
-  document.getElementById('historyPreview').innerHTML = `<div class="history-empty">${msg}</div>`;
-}
-
-function renderHistorySlider() {
-  const index = Number(document.getElementById('historySlider').value);
-  const version = historyVersions[index];
-  const prevContent = index > 0 ? historyVersions[index - 1].content : '';
-
-  document.getElementById('historySliderTime').textContent = formatHistoryTime(version.archived_at);
-  document.getElementById('historySliderPosition').textContent = `${index + 1} / ${historyVersions.length}`;
-
-  const previewEl = document.getElementById('historyPreview');
-  previewEl.innerHTML = '';
-  const diff = diffLines(prevContent, version.content || '');
-  diff.forEach(line => {
-    const el = document.createElement('span');
-    el.className = `history-diff-line ${line.type}`;
-    el.textContent = line.text || ' ';
-    previewEl.appendChild(el);
-  });
-}
-
-async function openHistoryDialog() {
-  const dialog = document.getElementById('historyDialog');
-  const slider = document.getElementById('historySlider');
-  document.getElementById('historySlider').closest('.history-slider-row').style.display = '';
-  document.getElementById('historyRestoreBtn').closest('.history-actions').style.display = '';
-  document.getElementById('historyPreview').innerHTML = '<div class="history-empty">読み込み中…</div>';
-  dialog.showModal();
-
-  if (!state.currentMemoId) {
-    showHistoryMessage('このエントリはまだ保存されていません。');
-    return;
-  }
-
-  let versions;
-  try {
-    versions = await apiGet(`/api/memo/${state.currentMemoId}/history`);
-  } catch (e) {
-    showHistoryMessage('履歴の取得に失敗しました。');
-    return;
-  }
-
-  if (!versions.length) {
-    showHistoryMessage('まだ履歴はありません（十分な間隔を空けて上書きすると記録されます）。');
-    return;
-  }
-
-  historyVersions = versions.slice().reverse(); // oldest -> newest
-  slider.min = 0;
-  slider.max = historyVersions.length - 1;
-  slider.value = historyVersions.length - 1; // default to the most recent checkpoint
-  renderHistorySlider();
-}
-
-document.getElementById('historySlider').addEventListener('input', renderHistorySlider);
-document.getElementById('historyRestoreBtn').addEventListener('click', () => {
-  const version = historyVersions[Number(document.getElementById('historySlider').value)];
-  if (!version) return;
-  if (!confirm('現在の内容をこの履歴で置き換えますか？（置き換え後に保存されます）')) return;
-  const el = document.getElementById('contentEdit');
-  el.value = version.content || '';
-  onFormInput();
-  updatePreview();
-  document.getElementById('historyDialog').close();
-});
-
-document.getElementById('historyBtn').addEventListener('click', openHistoryDialog);
-document.getElementById('historyCloseBtn').addEventListener('click', () => {
-  document.getElementById('historyDialog').close();
-});
-
-// ---------------------------------------------------------------------
 // Mode toggle (edit <-> doctor-facing read-only view, same page/URL)
 // ---------------------------------------------------------------------
 
@@ -1150,12 +890,11 @@ function toggleMode() {
   document.getElementById('jumpDateInput').value = state.selectedDate;
   renderArchive();
   loadEditorForSelectedDate();
-  // The admin's own read-only view shows the memo right away; only share-link
-  // visitors get the copy-to-reveal cover.
+  // The admin's own read-only view shows the memo right away; only the
+  // doctor's (guest) view gets the copy-to-reveal cover.
   setCovered(false);
 }
 
-document.getElementById('guestLinkBtn').addEventListener('click', copyGuestLink);
 
 // ---------------------------------------------------------------------
 // Share PIN (admin-only): the current 4-digit PIN, always shown at the top
@@ -1199,20 +938,20 @@ function startSharePin() {
 document.getElementById('viewOnlyBtn').addEventListener('click', toggleMode);
 document.getElementById('editBackBtn').addEventListener('click', toggleMode);
 
-// e: switch edit/view mode, l: copy a 24h guest link. Escape leaves the
+// e: switch edit/view mode. Escape leaves the
 // textarea so the keys work again.
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (document.activeElement && document.activeElement.id === 'contentEdit') document.activeElement.blur();
     return;
   }
-  if (e.key !== 'e' && e.key !== 'l') return;
+  if (e.key !== 'e') return;
   if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || e.isComposing) return;
   if (document.querySelector('dialog[open]') || document.body.classList.contains('auth-locked')) return;
   const t = e.target;
   if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
   e.preventDefault();
-  if (e.key === 'e') toggleMode(); else copyGuestLink();
+  toggleMode();
 });
 
 // ---------------------------------------------------------------------
@@ -1257,8 +996,8 @@ function startApp() {
 tryUnlockWithStoredToken().then(unlocked => {
   if (unlocked) {
     startApp();
-  } else if (document.getElementById('guestGateNotice').hidden) {
-    document.getElementById('authCodeInput').focus();
+  } else {
+    document.getElementById('authInput').focus();
   }
 });
 </script>

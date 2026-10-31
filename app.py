@@ -46,7 +46,6 @@ def no_cache_for_shell(response):
 
 
 GUEST_LINK_DEFAULT_HOURS = 24
-GUEST_LINK_MAX_HOURS = 24 * 30  # 30 days
 
 
 def is_valid_guest_token(token):
@@ -178,9 +177,6 @@ def list_memos():
     return jsonify([row_to_memo(r) for r in rows])
 
 
-HISTORY_MIN_INTERVAL_SECONDS = 600  # only checkpoint a version if this much time passed since the last save
-
-
 @app.route("/api/memo", methods=["POST"])
 @require_access(admin_only=True)
 def upsert_memo():
@@ -194,33 +190,6 @@ def upsert_memo():
 
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            # Lock the existing row (if any) so a burst of near-simultaneous
-            # autosaves can't each see a stale "last checkpoint" time and all
-            # archive at once.
-            cur.execute("SELECT * FROM memos WHERE date = %s FOR UPDATE", (memo_date,))
-            existing = cur.fetchone()
-
-            if existing and existing["content"] != content:
-                age = (datetime.now(timezone.utc) - existing["updated_at"]).total_seconds()
-                if age > HISTORY_MIN_INTERVAL_SECONDS:
-                    # Wrapped in a savepoint so that if this fails (e.g. the
-                    # memo_history table hasn't been migrated in yet), the
-                    # actual memo save below still goes through instead of
-                    # the whole request failing.
-                    try:
-                        cur.execute("SAVEPOINT memo_history_checkpoint")
-                        cur.execute(
-                            """
-                            INSERT INTO memo_history (memo_id, date, summary, content, archived_at)
-                            VALUES (%s, %s, %s, %s, %s)
-                            """,
-                            (existing["id"], existing["date"], existing["summary"], existing["content"], existing["updated_at"]),
-                        )
-                        cur.execute("RELEASE SAVEPOINT memo_history_checkpoint")
-                    except psycopg2.Error as e:
-                        cur.execute("ROLLBACK TO SAVEPOINT memo_history_checkpoint")
-                        print(f"[memo_history] checkpoint failed, continuing without it: {e}")
-
             cur.execute(
                 """
                 INSERT INTO memos (date, summary, content)
@@ -237,37 +206,6 @@ def upsert_memo():
         conn.commit()
 
     return jsonify(row_to_memo(row)), 201
-
-
-@app.route("/api/memo/<memo_id>/history", methods=["GET"])
-@require_access()
-def get_memo_history(memo_id):
-    limit = min(int(request.args.get("limit", 50)), 200)
-    with get_conn() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(
-                """
-                SELECT id, memo_id, date, summary, content, archived_at
-                FROM memo_history
-                WHERE memo_id = %s
-                ORDER BY archived_at DESC
-                LIMIT %s
-                """,
-                (memo_id, limit),
-            )
-            rows = cur.fetchall()
-
-    return jsonify([
-        {
-            "id": str(r["id"]),
-            "memo_id": str(r["memo_id"]),
-            "date": r["date"].isoformat(),
-            "summary": r["summary"],
-            "content": r["content"],
-            "archived_at": r["archived_at"].isoformat(),
-        }
-        for r in rows
-    ])
 
 
 @app.route("/api/memo/<memo_id>", methods=["GET"])
@@ -339,77 +277,6 @@ def delete_memo(memo_id):
 # without the admin token, e.g. a doctor viewing on their own device)
 # ---------------------------------------------------------------------------
 
-def row_to_guest_link(row):
-    return {
-        "id": str(row["id"]),
-        "token": row["token"],
-        "created_at": row["created_at"].isoformat(),
-        "expires_at": row["expires_at"].isoformat(),
-        "revoked": row["revoked_at"] is not None,
-        "expired": row["expires_at"] <= datetime.now(timezone.utc),
-    }
-
-
-@app.route("/api/guest-links", methods=["GET"])
-@require_access(admin_only=True)
-def list_guest_links():
-    with get_conn() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("SELECT * FROM guest_links ORDER BY created_at DESC LIMIT 100")
-            rows = cur.fetchall()
-
-    return jsonify([row_to_guest_link(r) for r in rows])
-
-
-@app.route("/api/guest-links", methods=["POST"])
-@require_access(admin_only=True)
-def create_guest_link():
-    data = request.get_json(force=True, silent=True) or {}
-    # pending=True pre-creates a token that is not valid yet (already expired);
-    # activate_guest_link() starts its clock.
-    pending = bool(data.get("pending"))
-    hours = data.get("hours", GUEST_LINK_DEFAULT_HOURS)
-    try:
-        hours = float(hours)
-    except (TypeError, ValueError):
-        return jsonify({"error": "hours must be a number"}), 400
-    if not pending and not (0 < hours <= GUEST_LINK_MAX_HOURS):
-        return jsonify({"error": f"hours must be between 0 and {GUEST_LINK_MAX_HOURS}"}), 400
-
-    token = secrets.token_urlsafe(24)
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=0 if pending else hours)
-
-    with get_conn() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(
-                "INSERT INTO guest_links (token, expires_at) VALUES (%s, %s) RETURNING *",
-                (token, expires_at),
-            )
-            row = cur.fetchone()
-        conn.commit()
-
-    return jsonify(row_to_guest_link(row)), 201
-
-
-@app.route("/api/guest-links/<link_id>/activate", methods=["POST"])
-@require_access(admin_only=True)
-def activate_guest_link(link_id):
-    # Starts the 24h window now, for a link created ahead of time.
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=GUEST_LINK_DEFAULT_HOURS)
-    with get_conn() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(
-                "UPDATE guest_links SET expires_at = %s WHERE id = %s AND revoked_at IS NULL RETURNING *",
-                (expires_at, link_id),
-            )
-            row = cur.fetchone()
-        conn.commit()
-
-    if not row:
-        return jsonify({"error": "not found or revoked"}), 404
-    return jsonify(row_to_guest_link(row))
-
-
 # Share PIN: a 4-digit PIN always shown on the patient's edit screen, which
 # the doctor types on their own PC to get a 24h read-only link (no camera,
 # no forwarding through another service). Only one PIN is live at a time; it
@@ -470,23 +337,6 @@ def redeem_share_pin():
         conn.commit()
 
     return jsonify({"token": token})
-
-
-@app.route("/api/guest-links/<link_id>", methods=["DELETE"])
-@require_access(admin_only=True)
-def revoke_guest_link(link_id):
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE guest_links SET revoked_at = now() WHERE id = %s AND revoked_at IS NULL RETURNING id",
-                (link_id,),
-            )
-            updated = cur.fetchone()
-        conn.commit()
-
-    if not updated:
-        return jsonify({"error": "not found or already revoked"}), 404
-    return jsonify({"ok": True})
 
 
 # ---------------------------------------------------------------------------
