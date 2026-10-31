@@ -410,70 +410,66 @@ def activate_guest_link(link_id):
     return jsonify(row_to_guest_link(row))
 
 
-# Short share code: shown on the patient's screen (with a QR code) so the
-# doctor can open the memo on their own device without the link being sent
-# through another service. Single-use, valid for a few minutes, and swapped
-# for the link's real token on redemption.
-SHARE_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"  # no 0/O, 1/I/L
-SHARE_CODE_LENGTH = 8
-SHARE_CODE_MINUTES = 10
+# Share PIN: a 4-digit PIN always shown on the patient's edit screen, which
+# the doctor types on their own PC to get a 24h read-only link (no camera,
+# no forwarding through another service). Only one PIN is live at a time; it
+# rotates every few minutes, after one successful use, or after a handful of
+# wrong guesses, which keeps 4 digits from being brute-forced.
+SHARE_PIN_MINUTES = 5
+SHARE_PIN_MAX_FAILURES = 5
 
 
-def normalize_share_code(code):
-    return re.sub(r"[^A-Z0-9]", "", (code or "").upper())
+def live_share_pin_row(cur):
+    cur.execute(
+        "SELECT * FROM share_pins WHERE used_at IS NULL AND expires_at > now() "
+        "AND failed_attempts < %s ORDER BY created_at DESC LIMIT 1 FOR UPDATE",
+        (SHARE_PIN_MAX_FAILURES,),
+    )
+    return cur.fetchone()
 
 
-@app.route("/api/guest-links/share", methods=["POST"])
+@app.route("/api/share-pin", methods=["GET"])
 @require_access(admin_only=True)
-def create_share_code():
-    token = secrets.token_urlsafe(24)
-    now = datetime.now(timezone.utc)
-    expires_at = now + timedelta(hours=GUEST_LINK_DEFAULT_HOURS)
-    code_expires_at = now + timedelta(minutes=SHARE_CODE_MINUTES)
+def current_share_pin():
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            row = live_share_pin_row(cur)
+            if not row:
+                cur.execute("DELETE FROM share_pins")
+                cur.execute(
+                    "INSERT INTO share_pins (pin, expires_at) VALUES (%s, %s) RETURNING *",
+                    (f"{secrets.randbelow(10000):04d}",
+                     datetime.now(timezone.utc) + timedelta(minutes=SHARE_PIN_MINUTES)),
+                )
+                row = cur.fetchone()
+        conn.commit()
+
+    return jsonify({"pin": row["pin"], "expires_at": row["expires_at"].isoformat()})
+
+
+@app.route("/api/share-pin/redeem", methods=["POST"])
+def redeem_share_pin():
+    data = request.get_json(force=True, silent=True) or {}
+    pin = re.sub(r"\D", "", str(data.get("pin") or ""))
 
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            for _ in range(5):  # retry on the (very unlikely) code collision
-                code = "".join(secrets.choice(SHARE_CODE_ALPHABET) for _ in range(SHARE_CODE_LENGTH))
-                cur.execute(
-                    "INSERT INTO guest_links (token, expires_at, short_code, short_code_expires_at) "
-                    "VALUES (%s, %s, %s, %s) ON CONFLICT (short_code) DO NOTHING RETURNING *",
-                    (token, expires_at, code, code_expires_at),
-                )
-                row = cur.fetchone()
+            row = live_share_pin_row(cur)
+            if not row or len(pin) != 4 or not hmac.compare_digest(pin, row["pin"]):
                 if row:
-                    break
-        conn.commit()
+                    cur.execute("UPDATE share_pins SET failed_attempts = failed_attempts + 1 WHERE id = %s", (row["id"],))
+                conn.commit()
+                return jsonify({"error": "invalid or expired pin"}), 404
 
-    if not row:
-        return jsonify({"error": "could not allocate a share code"}), 500
-    link = row_to_guest_link(row)
-    link["code"] = code
-    link["code_expires_at"] = code_expires_at.isoformat()
-    return jsonify(link), 201
-
-
-@app.route("/api/guest-links/redeem", methods=["POST"])
-def redeem_share_code():
-    data = request.get_json(force=True, silent=True) or {}
-    code = normalize_share_code(data.get("code"))
-    if len(code) != SHARE_CODE_LENGTH:
-        return jsonify({"error": "invalid code"}), 404
-
-    with get_conn() as conn:
-        with conn.cursor() as cur:
+            cur.execute("UPDATE share_pins SET used_at = now() WHERE id = %s", (row["id"],))
+            token = secrets.token_urlsafe(24)
             cur.execute(
-                "UPDATE guest_links SET short_code = NULL, short_code_expires_at = NULL "
-                "WHERE short_code = %s AND short_code_expires_at > now() "
-                "AND revoked_at IS NULL AND expires_at > now() RETURNING token",
-                (code,),
+                "INSERT INTO guest_links (token, expires_at) VALUES (%s, %s)",
+                (token, datetime.now(timezone.utc) + timedelta(hours=GUEST_LINK_DEFAULT_HOURS)),
             )
-            row = cur.fetchone()
         conn.commit()
 
-    if not row:
-        return jsonify({"error": "invalid or expired code"}), 404
-    return jsonify({"token": row[0]})
+    return jsonify({"token": token})
 
 
 @app.route("/api/guest-links/<link_id>", methods=["DELETE"])

@@ -11,7 +11,6 @@
 <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="{{ url_for('static', filename='qrcode.js') }}"></script>
 <style>
   .app {
     display: grid;
@@ -72,7 +71,11 @@
   body.view-mode .copy-btn[data-label]::after { font-size: 0.78rem; }
   body.view-mode [data-label].done::after { content: 'コピーしました ✓'; }
   .head-actions { display: flex; gap: 6px; align-items: center; }
-  #guestLinkBtn[hidden], #shareBtn[hidden] { display: none; }
+  #guestLinkBtn[hidden], .share-pin[hidden] { display: none; }
+  .share-pin { font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; margin-right: 4px; }
+  .share-pin strong { font-size: 1.15rem; letter-spacing: 0.15em; color: var(--text); font-family: ui-monospace, Menlo, monospace; }
+  #sharePinTimer { color: var(--text-faint); font-size: 0.75rem; }
+  body.view-mode .share-pin { display: none; }
   #editBackBtn { display: none; }
   body.view-mode.is-admin #editBackBtn { display: inline-block; }
   .copy-btn { display: none; font-size: 0.78rem; padding: 5px 12px; }
@@ -193,13 +196,6 @@
   .history-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
   .history-empty { font-size: 0.82rem; color: var(--text-dim); padding: 8px 4px; }
 
-  .share-dialog { width: min(420px, 92vw); }
-  .share-body { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
-  .share-qr { width: 220px; height: 220px; background: #fff; padding: 10px; border-radius: var(--radius-sm); }
-  .share-qr svg { width: 100%; height: 100%; display: block; }
-  .share-note { margin: 0; font-size: 0.8rem; color: var(--text-dim); }
-  .share-code { font-size: 2rem; font-weight: 700; letter-spacing: 0.12em; font-family: ui-monospace, Menlo, monospace; }
-
   /* Image lightbox (click a preview image to view it full-size) ---- */
   .lightbox-dialog {
     box-sizing: border-box;
@@ -257,7 +253,7 @@
   .auth-gate-card[hidden] { display: none; }
   .auth-gate-card h2 { margin: 0; font-size: 1.05rem; }
   .auth-gate-card input[type=password] { width: 100%; }
-  #authCodeInput { width: 100%; font-size: 1.3rem; letter-spacing: 0.12em; text-align: center; text-transform: uppercase; }
+  #authCodeInput { width: 100%; font-size: 1.6rem; letter-spacing: 0.4em; text-align: center; }
   .auth-token-alt summary { font-size: 0.78rem; color: var(--text-faint); cursor: pointer; margin-bottom: 8px; }
   .auth-gate-error { font-size: 0.8rem; color: var(--danger); min-height: 1em; }
   body.auth-locked .app { display: none; }
@@ -268,8 +264,8 @@
 <body class="view-mode auth-locked">
 <div class="auth-gate" id="authGate">
   <form class="card auth-gate-card" id="authGateForm">
-    <h2>🔒 共有コードを入力してください</h2>
-    <input type="text" id="authCodeInput" placeholder="例: ABCD-EFGH" autocomplete="off" autocapitalize="characters" spellcheck="false">
+    <h2>🔒 4桁のPINを入力してください</h2>
+    <input type="text" id="authCodeInput" placeholder="0000" inputmode="numeric" maxlength="4" autocomplete="off" spellcheck="false">
     <details class="auth-token-alt">
       <summary>アクセストークンで開く</summary>
       <input type="password" id="authTokenInput" placeholder="トークンを入力" autocomplete="current-password">
@@ -298,7 +294,7 @@
         <span class="selected-date-weekday" id="selectedDateWeekday"></span>
       </div>
       <div class="head-actions">
-        <button class="btn secondary" id="shareBtn" data-label="📱 主治医に表示" title="主治医に表示（QR・共有コード）" aria-label="主治医に表示" hidden>📱</button>
+        <span class="share-pin" id="sharePin" title="主治医がパソコンでこのアプリを開いて入力するPIN" hidden>PIN <strong id="sharePinValue">----</strong> <span id="sharePinTimer"></span></span>
         <button class="btn secondary" id="guestLinkBtn" data-label="🔗 24時間公開URLをコピー" title="24時間公開URLをコピー" aria-label="24時間公開URLをコピー" hidden>🔗</button>
         <button class="btn secondary" id="editBackBtn" data-label="✏️ 編集に戻る" title="編集に戻る" aria-label="編集に戻る">✏️</button>
         <button class="btn secondary copy-btn" id="copyBtn" data-label="メモをコピー" title="メモをコピー" aria-label="メモをコピー">📋</button>
@@ -326,20 +322,6 @@
 
   <div class="archive" id="archive"></div>
 </div>
-
-<dialog id="shareDialog" class="history-dialog share-dialog">
-  <div class="history-head">
-    <h2 style="margin:0;">📱 主治医に表示</h2>
-    <button type="button" class="btn secondary" id="shareCloseBtn" title="閉じる" aria-label="閉じる">✕</button>
-  </div>
-  <div class="share-body">
-    <div class="share-qr" id="shareQr"></div>
-    <p class="share-note">スマホで読み取るか、パソコンで <strong id="shareHost"></strong> を開いて次のコードを入力</p>
-    <div class="share-code" id="shareCode">…</div>
-    <p class="share-note" id="shareExpiry"></p>
-    <button type="button" class="btn secondary" id="shareRenewBtn">新しいコードを発行</button>
-  </div>
-</dialog>
 
 <dialog id="historyDialog" class="history-dialog">
   <div class="history-head">
@@ -437,7 +419,8 @@ function applyRoleToUI(role) {
     document.body.classList.remove('view-mode');
     document.body.classList.add('is-admin');
     document.getElementById('guestLinkBtn').hidden = false;
-    document.getElementById('shareBtn').hidden = false;
+    document.getElementById('sharePin').hidden = false;
+    startSharePin();
     prepareGuestLink();
   }
 }
@@ -511,14 +494,14 @@ document.getElementById('authGateForm').addEventListener('submit', async (e) => 
   errorEl.textContent = '';
   try {
     if (code) {
-      // A share code shown on the patient's screen: swap it for the guest token.
-      const redeem = await fetch('/api/guest-links/redeem', {
+      // The PIN shown on the patient's screen: swap it for a guest token.
+      const redeem = await fetch('/api/share-pin/redeem', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ pin: code }),
       });
       if (!redeem.ok) {
-        errorEl.textContent = redeem.status === 404 ? 'コードが正しくないか、期限切れです' : `サーバーエラー (${redeem.status})`;
+        errorEl.textContent = redeem.status === 404 ? 'PINが正しくないか、期限切れです（画面の最新のPINを入力してください）' : `サーバーエラー (${redeem.status})`;
         return;
       }
       token = (await redeem.json()).token;
@@ -1175,53 +1158,44 @@ function toggleMode() {
 document.getElementById('guestLinkBtn').addEventListener('click', copyGuestLink);
 
 // ---------------------------------------------------------------------
-// Show to the doctor (admin-only): a fresh 24h guest link as a QR code plus
-// a short single-use code the doctor types on their own PC, so nothing has
-// to be forwarded through another service.
+// Share PIN (admin-only): the current 4-digit PIN, always shown at the top
+// right of the edit screen. The server rotates it every few minutes and
+// after each use, so it is re-fetched periodically and when it runs out.
 // ---------------------------------------------------------------------
 
-let shareExpiryTimer = null;
+let sharePinExpiresAt = 0;
 
-async function issueShareCode() {
-  const qrEl = document.getElementById('shareQr');
-  const codeEl = document.getElementById('shareCode');
-  const expiryEl = document.getElementById('shareExpiry');
-  qrEl.innerHTML = '';
-  codeEl.textContent = '…';
-  expiryEl.textContent = '';
-  clearInterval(shareExpiryTimer);
+async function refreshSharePin() {
   try {
-    const res = await fetch('/api/guest-links/share', { method: 'POST', headers: authHeaders() });
-    if (!res.ok) throw new Error(res.status);
-    const link = await res.json();
-    const qr = qrcode(0, 'M');
-    qr.addData(`${location.origin}/?guest=${encodeURIComponent(link.token)}`);
-    qr.make();
-    qrEl.innerHTML = qr.createSvgTag({ scalable: true, margin: 0 });
-    codeEl.textContent = `${link.code.slice(0, 4)}-${link.code.slice(4)}`;
-    const until = new Date(link.code_expires_at);
-    const tick = () => {
-      const sec = Math.max(0, Math.round((until - Date.now()) / 1000));
-      expiryEl.textContent = sec > 0
-        ? `コードはあと ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')} 有効（1回限り）・表示は24時間`
-        : 'コードの期限が切れました（QRは24時間有効）';
-      if (!sec) clearInterval(shareExpiryTimer);
-    };
-    tick();
-    shareExpiryTimer = setInterval(tick, 1000);
+    const { pin, expires_at } = await apiGet('/api/share-pin');
+    document.getElementById('sharePinValue').textContent = pin;
+    sharePinExpiresAt = new Date(expires_at).getTime();
   } catch (e) {
-    codeEl.textContent = '発行できませんでした';
+    document.getElementById('sharePinValue').textContent = '----';
+    sharePinExpiresAt = 0;
   }
+  tickSharePin();
 }
 
-document.getElementById('shareHost').textContent = location.host;
-document.getElementById('shareBtn').addEventListener('click', () => {
-  document.getElementById('shareDialog').showModal();
-  issueShareCode();
-});
-document.getElementById('shareRenewBtn').addEventListener('click', issueShareCode);
-document.getElementById('shareCloseBtn').addEventListener('click', () => document.getElementById('shareDialog').close());
-document.getElementById('shareDialog').addEventListener('close', () => clearInterval(shareExpiryTimer));
+function tickSharePin() {
+  const sec = Math.max(0, Math.round((sharePinExpiresAt - Date.now()) / 1000));
+  document.getElementById('sharePinTimer').textContent = sec ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}` : '';
+}
+
+function startSharePin() {
+  refreshSharePin();
+  let sinceRefresh = 0;
+  setInterval(() => {
+    tickSharePin();
+    sinceRefresh++;
+    // Re-check every 15s (picks up a PIN that was just used) and as soon as it expires.
+    if (document.hidden) return;
+    if (sinceRefresh >= 15 || (sharePinExpiresAt && Date.now() >= sharePinExpiresAt)) {
+      sinceRefresh = 0;
+      refreshSharePin();
+    }
+  }, 1000);
+}
 document.getElementById('viewOnlyBtn').addEventListener('click', toggleMode);
 document.getElementById('editBackBtn').addEventListener('click', toggleMode);
 

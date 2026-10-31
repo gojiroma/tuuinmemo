@@ -52,9 +52,16 @@ CREATE TABLE IF NOT EXISTS guest_links (
 
 CREATE INDEX IF NOT EXISTS idx_guest_links_token ON guest_links (token);
 
--- 主治医の端末で入力する短い共有コード（10分以内・1回だけ使える。使うとトークンと交換して消える）
-ALTER TABLE guest_links ADD COLUMN IF NOT EXISTS short_code text UNIQUE;
-ALTER TABLE guest_links ADD COLUMN IF NOT EXISTS short_code_expires_at timestamptz;
+-- 主治医が入力する4桁PIN（編集画面に常時表示。数分ごとに入れ替わり、1回使うか
+-- 規定回数間違えると無効になる。正しく入力されると24時間の閲覧リンクを発行）
+CREATE TABLE IF NOT EXISTS share_pins (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    pin text NOT NULL,
+    expires_at timestamptz NOT NULL,
+    failed_attempts integer NOT NULL DEFAULT 0,
+    used_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
 
 -- 服薬期間（名前と開始日〜終了日。終了日が空なら継続中）
 CREATE TABLE IF NOT EXISTS memo_medications (

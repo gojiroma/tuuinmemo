@@ -69,9 +69,9 @@ PWAとしてホーム画面に追加した場合の起動先も`/`です。
 | GET | `/api/guest-links` | 発行済み一時URLトークンの一覧 | 管理者のみ |
 | POST | `/api/guest-links` | 一時URLトークンの発行（`{"hours": 24}`、1〜720時間） | 管理者のみ |
 | POST | `/api/guest-links/<id>/activate` | 事前作成した一時URLトークンを今から24時間有効にする（`POST /api/guest-links`は`{"pending": true}`で未有効のまま作成） | 管理者のみ |
-| POST | `/api/guest-links/share` | 24時間有効な一時URLと、10分以内・1回限りの共有コード（8文字）を発行（画面のQR・コード表示用） | 管理者のみ |
-| POST | `/api/guest-links/redeem` | 共有コード（`{"code"}`）を一時URLトークンと交換（使ったコードは消える） | 誰でも |
 | DELETE | `/api/guest-links/<id>` | 一時URLトークンの失効 | 管理者のみ |
+| GET | `/api/share-pin` | 編集画面に表示する現在の4桁PIN（なければ発行。5分・1回限り・5回誤入力で無効） | 管理者のみ |
+| POST | `/api/share-pin/redeem` | PIN（`{"pin"}`）が正しければ24時間の一時URLトークンを発行 | 誰でも |
 
 
 
